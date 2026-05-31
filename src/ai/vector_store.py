@@ -7,8 +7,8 @@ logger = get_logger(__name__)
 _store = None
 
 
-class _GeminiEmbeddingFunction:
-    """ChromaDB embedding function backed by the Gemini API service."""
+class _LocalEmbeddingFunction:
+    """ChromaDB embedding function backed by the local sentence-transformers model."""
 
     def __call__(self, input: List[str]) -> List[List[float]]:
         from src.ai.embedding_service import get_embedding_service, EMBEDDING_DIM
@@ -18,7 +18,7 @@ class _GeminiEmbeddingFunction:
         return [[0.0] * EMBEDDING_DIM for _ in input]
 
 
-_gemini_ef = _GeminiEmbeddingFunction()
+_local_ef = _LocalEmbeddingFunction()
 
 
 class VectorStore:
@@ -27,12 +27,12 @@ class VectorStore:
         self._client = chromadb.PersistentClient(path=chroma_path)
         self.messages_collection = self._client.get_or_create_collection(
             name="messages",
-            embedding_function=_gemini_ef,
+            embedding_function=_local_ef,
             metadata={"hnsw:space": "cosine"},
         )
         self.media_collection = self._client.get_or_create_collection(
             name="media_metadata",
-            embedding_function=_gemini_ef,
+            embedding_function=_local_ef,
             metadata={"hnsw:space": "cosine"},
         )
         logger.info(
