@@ -4,6 +4,7 @@ import {
   Users, Loader2, Sparkles, Search, Bot, Settings,
   Mic, Video, FileText, Pencil, Trash2, Shield, ShieldOff,
   UserMinus, UserPlus, Check, X, Send, Paperclip, MessageSquare, Plus,
+  Image, CheckSquare, Square, ExternalLink,
 } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
@@ -25,6 +26,8 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
 
   const [members, setMembers] = useState([])
   const [summary, setSummary] = useState(null)
+  const [actionItems, setActionItems] = useState([])
+  const [checkedItems, setCheckedItems] = useState({})
   const [summarising, setSummarising] = useState(false)
   const [myRole, setMyRole] = useState('member')
 
@@ -59,9 +62,12 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
     if (!activeConversation?.isGroup) return
     setSummarising(true)
     setSummary(null)
+    setActionItems([])
+    setCheckedItems({})
     try {
       const r = await client.post('/ai/summarise', { group_id: activeConversation.id, days: 14 })
       setSummary(r.data.summary)
+      setActionItems(r.data.action_items || [])
     } catch { toast.error('Summary failed') } finally { setSummarising(false) }
   }
 
@@ -182,6 +188,9 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
           myRole={myRole}
           isAdmin={isAdmin}
           summary={summary}
+          actionItems={actionItems}
+          checkedItems={checkedItems}
+          onToggleCheck={(i) => setCheckedItems(prev => ({ ...prev, [i]: !prev[i] }))}
           summarising={summarising}
           onSummary={handleSummary}
           editing={editing}
@@ -223,7 +232,7 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
 
 function GroupPanel({
   convId, groupTab, onTabChange, members, myRole, isAdmin,
-  summary, summarising, onSummary,
+  summary, actionItems, checkedItems, onToggleCheck, summarising, onSummary,
   editing, editName, editDesc, editLoading,
   onEditStart, onEditCancel, onEditNameChange, onEditDescChange, onEditSave, onDeleteGroup,
   onRoleToggle, onRemoveMember,
@@ -388,7 +397,7 @@ function GroupPanel({
       )}
 
       {groupTab === 'summary' && (
-        <div className="flex-1 overflow-y-auto p-3 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto p-3 scrollbar-thin space-y-3">
           <button
             onClick={onSummary}
             disabled={summarising}
@@ -398,16 +407,47 @@ function GroupPanel({
             {summarising ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
             {t('groups.aiSummary')}
           </button>
+
           {summary && (
             <div
-              className="mt-3 p-3 rounded-xl text-xs text-slate-700 leading-relaxed max-h-[calc(100vh-220px)] overflow-y-auto scrollbar-thin border border-indigo-100"
+              className="p-3 rounded-xl text-xs text-slate-700 leading-relaxed border border-indigo-100"
               style={{ background: 'linear-gradient(135deg, #f0f4ff, #f5f3ff)' }}
             >
               <div className="flex items-center gap-1.5 mb-2">
                 <Sparkles size={11} className="text-indigo-500" />
                 <span className="text-xs font-bold text-indigo-600">AI Summary · Last 14 days</span>
               </div>
-              {summary}
+              <p className="whitespace-pre-wrap">{summary}</p>
+            </div>
+          )}
+
+          {actionItems.length > 0 && (
+            <div className="border border-amber-200 rounded-xl overflow-hidden"
+                 style={{ background: 'linear-gradient(135deg, #fffbeb, #fefce8)' }}>
+              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-amber-100">
+                <CheckSquare size={12} className="text-amber-500" />
+                <span className="text-xs font-bold text-amber-700">Action Items</span>
+                <span className="ml-auto text-xs text-amber-500 font-medium">
+                  {Object.values(checkedItems).filter(Boolean).length}/{actionItems.length}
+                </span>
+              </div>
+              <div className="p-2 space-y-1">
+                {actionItems.map((item, i) => (
+                  <button
+                    key={i}
+                    onClick={() => onToggleCheck(i)}
+                    className="w-full flex items-start gap-2 text-left px-2 py-1.5 rounded-lg hover:bg-amber-50 transition-all"
+                  >
+                    {checkedItems[i]
+                      ? <CheckSquare size={13} className="text-emerald-500 flex-shrink-0 mt-0.5" />
+                      : <Square size={13} className="text-amber-400 flex-shrink-0 mt-0.5" />
+                    }
+                    <span className={`text-xs leading-relaxed ${checkedItems[i] ? 'line-through text-slate-400' : 'text-slate-700'}`}>
+                      {item}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -570,8 +610,8 @@ function InlineAIChat({ convId, convName, isGroup, otherUserId }) {
   }
 
   const STARTERS = isGroup
-    ? [`Summarize ${convName || 'this group'}`, 'What was decided recently? 🤔', 'Find messages about deadlines 📌']
-    : [`Summarize my chat with ${convName || 'this person'} 📋`, 'What did we discuss? 💬', 'Find messages from last week 🔍']
+    ? [`Summarize ${convName || 'this group'}`, 'What was decided recently? 🤔', 'Show me unread images 🖼️']
+    : [`Summarize my chat with ${convName || 'this person'} 📋`, 'What did we discuss? 💬', 'Show me unread images 🖼️']
 
   return (
     <div className="flex flex-col flex-1 overflow-hidden relative">
@@ -738,27 +778,71 @@ function InlineAIChat({ convId, convName, isGroup, otherUserId }) {
 
 function MiniToolCard({ tc }) {
   const [open, setOpen] = useState(false)
+  const { setActiveConversation } = useChatStore()
   const result = tc.result
+  const isImageTool = tc.tool === 'fetch_unread_images'
   const count = Array.isArray(result) ? result.length : (result?.summary ? 1 : 0)
+
+  const navigateTo = (img) => {
+    if (img.group_id) {
+      setActiveConversation({ id: img.group_id, name: img.group_name || 'Group', isGroup: true })
+    } else if (img.receiver_id) {
+      setActiveConversation({ id: img.sender_id, name: 'DM', isGroup: false })
+    }
+  }
+
   return (
     <div className="bg-white border border-indigo-100 rounded-lg overflow-hidden">
       <button onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs hover:bg-indigo-50/50 transition-all">
-        <span className="font-semibold text-indigo-600 truncate">🔧 {tc.tool}</span>
+        <span className="font-semibold text-indigo-600 truncate">
+          {isImageTool ? '🖼️' : '🔧'} {tc.tool}
+        </span>
         <span className="text-slate-400 flex-shrink-0 ml-1">{count > 0 ? count : ''} {open ? '▲' : '▼'}</span>
       </button>
       {open && result && (
-        <div className="px-2.5 pb-1.5 space-y-1">
-          {Array.isArray(result)
-            ? result.slice(0, 3).map((r, i) => (
-                <p key={i} className="text-xs text-slate-600 bg-indigo-50/50 rounded-md p-1.5 truncate">
-                  {r.content || JSON.stringify(r).slice(0, 80)}
-                </p>
-              ))
-            : <p className="text-xs text-slate-600 whitespace-pre-wrap break-words">
-                {result?.summary || result?.error || JSON.stringify(result).slice(0, 150)}
+        <div className="px-2.5 pb-2 space-y-1">
+          {isImageTool && Array.isArray(result) ? (
+            result.length === 0 ? (
+              <p className="text-xs text-slate-400 italic py-1">No unread images found.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-1.5 pt-1">
+                {result.map((img, i) => (
+                  <button
+                    key={i}
+                    onClick={() => navigateTo(img)}
+                    className="relative group rounded-lg overflow-hidden border border-slate-100 hover:border-indigo-300 transition-all aspect-square bg-slate-50"
+                    title={img.group_name || 'Go to chat'}
+                  >
+                    <img
+                      src={resolveUrl(img.media_url)}
+                      alt={img.content || 'image'}
+                      className="w-full h-full object-cover"
+                      onError={(e) => { e.target.style.display = 'none' }}
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all flex items-center justify-center opacity-0 group-hover:opacity-100">
+                      <ExternalLink size={14} className="text-white" />
+                    </div>
+                    {img.group_name && (
+                      <div className="absolute bottom-0 inset-x-0 bg-black/50 px-1 py-0.5">
+                        <p className="text-white text-xs truncate leading-tight">{img.group_name}</p>
+                      </div>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )
+          ) : Array.isArray(result) ? (
+            result.slice(0, 3).map((r, i) => (
+              <p key={i} className="text-xs text-slate-600 bg-indigo-50/50 rounded-md p-1.5 truncate">
+                {r.content || JSON.stringify(r).slice(0, 80)}
               </p>
-          }
+            ))
+          ) : (
+            <p className="text-xs text-slate-600 whitespace-pre-wrap break-words">
+              {result?.summary || result?.error || JSON.stringify(result).slice(0, 150)}
+            </p>
+          )}
         </div>
       )}
     </div>

@@ -252,6 +252,56 @@ async def delete_message(message_id: str, current_user=Depends(get_current_user)
     return {"status": "deleted"}
 
 
+@router.get("/unread-images")
+async def get_unread_images(current_user=Depends(get_current_user)):
+    """Return unread image messages across all conversations for the current user."""
+    from src.common.database import get_mongo_db, get_pg_pool
+    db = get_mongo_db()
+    pool = get_pg_pool()
+    user_id = str(current_user.user_id)
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT g.group_id, g.group_name FROM groups g "
+            "JOIN group_members gm ON g.group_id = gm.group_id "
+            "WHERE gm.user_id = $1", user_id
+        )
+    group_map = {str(r["group_id"]): r["group_name"] for r in rows}
+    group_ids = list(group_map.keys())
+
+    cursor = db.messages.find(
+        {
+            "media_type": "image",
+            "$or": [
+                {"receiver_id": user_id, "read_status": "unread"},
+                {
+                    "group_id": {"$in": group_ids},
+                    "sender_id": {"$ne": user_id},
+                    "read_by": {"$not": {"$elemMatch": {"$eq": user_id}}},
+                },
+            ],
+        },
+        {"message_id": 1, "media_url": 1, "content": 1, "sender_id": 1,
+         "group_id": 1, "receiver_id": 1, "timestamp": 1},
+    ).limit(20).sort("timestamp", -1)
+
+    results = []
+    async for msg in cursor:
+        gid = str(msg.get("group_id") or "")
+        ts = msg.get("timestamp")
+        results.append({
+            "message_id": str(msg.get("message_id") or str(msg["_id"])),
+            "media_url": msg.get("media_url") or "",
+            "content": msg.get("content") or "",
+            "sender_id": str(msg.get("sender_id") or ""),
+            "group_id": gid,
+            "receiver_id": str(msg.get("receiver_id") or ""),
+            "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts or ""),
+            "group_name": group_map.get(gid, ""),
+        })
+    return results
+
+
 class SuggestRepliesRequest(BaseModel):
     message: str
     context: List[str] = []

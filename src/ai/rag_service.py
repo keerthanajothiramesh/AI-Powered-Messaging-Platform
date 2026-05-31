@@ -325,6 +325,28 @@ async def summarise_conversation(
     return result["summary"]
 
 
+async def extract_action_items(summary: str) -> List[str]:
+    """Extract concrete action items from a conversation summary using Gemini."""
+    import json, re as _re
+    prompt = (
+        "Extract all concrete action items from this conversation summary. "
+        "An action item is a specific task assigned to someone, with or without a deadline. "
+        "Return ONLY a raw JSON array of short strings (one per action item, max 10). "
+        "If none found, return []. No markdown, no explanation.\n\n"
+        f"Summary:\n{summary}"
+    )
+    try:
+        raw = await generate_text(prompt, temperature=0.2, max_tokens=300)
+        raw = _re.sub(r"```[a-z]*\n?", "", raw).strip()
+        match = _re.search(r'\[.*\]', raw, _re.DOTALL)
+        if match:
+            items = json.loads(match.group())
+            return [str(s).strip() for s in items if str(s).strip()][:10]
+    except Exception:
+        pass
+    return []
+
+
 async def summarise_dm(
     user_id: str,
     other_user_id: str,

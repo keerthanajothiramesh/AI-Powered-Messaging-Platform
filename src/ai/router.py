@@ -4,7 +4,7 @@ from typing import Optional, Dict
 from datetime import datetime, timezone, timedelta
 
 from src.auth.dependencies import get_current_user
-from src.ai.rag_service import summarise_conversation, catch_up_summary, search_with_ai
+from src.ai.rag_service import summarise_conversation, catch_up_summary, search_with_ai, extract_action_items
 from src.ai.chatbot_service import get_or_create_session, clear_session
 from src.common.logger import get_logger
 
@@ -67,12 +67,14 @@ async def summarise(data: SummariseRequest, current_user=Depends(get_current_use
         "days": data.days,
     })
 
+    action_items = await extract_action_items(result["summary"])
     return {
         "group_id": data.group_id,
         "group_name": group_name,
         "days": data.days,
         "summary": result["summary"],
         "quality_score": round(result.get("quality_score", 0), 1),
+        "action_items": action_items,
     }
 
 
