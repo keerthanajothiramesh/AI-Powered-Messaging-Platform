@@ -19,14 +19,9 @@ fastembed>=0.3.6
 
 # AI / LLM
 google-generativeai==0.8.3
-langchain==0.3.7
-langchain-google-genai==2.0.7
-langchain-community==0.3.7
-langgraph==0.2.55
 rank-bm25==0.2.2
-tiktoken==0.8.0
 
-# Language
+# Language detection
 langdetect==1.0.9
 
 # Security
@@ -35,25 +30,19 @@ passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 google-auth==2.37.0
 
-# Media + Document text extraction
+# Media + Document text extraction (lazy-imported, only loads when file is uploaded)
 boto3==1.35.68
 Pillow==11.0.0
 PyMuPDF>=1.24.0
 python-docx>=1.1.0
 python-pptx>=1.0.0
 
-# PII detection — Presidio with spaCy NER (regex fallback if model not downloaded)
-presidio-analyzer>=2.2.0
-presidio-anonymizer>=2.2.0
-spacy>=3.7.0,<4.0.0
+# PII detection — regex-only on free tier (no spaCy/Presidio, saves ~300MB RAM)
+# To enable full Presidio NER locally: pip install presidio-analyzer presidio-anonymizer spacy
+#   and: python -m spacy download en_core_web_sm
 
 # Observability
 structlog==24.4.0
-
-# Data Generation
-faker==33.1.0
-pandas==2.2.3
-numpy==1.26.4
 
 # Utilities
 pydantic[email]==2.10.3
@@ -66,4 +55,3 @@ tenacity==8.4.2
 # Testing
 pytest==8.3.4
 pytest-asyncio==0.24.0
-locust==2.32.4
