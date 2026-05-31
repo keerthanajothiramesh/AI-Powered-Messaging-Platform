@@ -446,13 +446,13 @@ async def catch_up_summary(user_id: str, offline_since: datetime) -> Dict:
                 chunk_sums, CATCHUP_PROMPT, label=row["group_name"]
             )
 
-        return row["group_name"], summary, len(msgs)
+        return row["group_name"], str(row["group_id"]), summary, len(msgs)
 
     group_results = await asyncio.gather(*[_summarise_group(r) for r in group_rows])
 
-    for name, summary, count in group_results:
+    for name, gid, summary, count in group_results:
         if summary:
-            group_summaries[name] = {"count": count, "summary": summary}
+            group_summaries[name] = {"count": count, "summary": summary, "group_id": gid}
             total_missed += count
 
     dm_summary = None

@@ -104,7 +104,14 @@ export default function DashboardPage() {
       <main className="flex-1 flex flex-col overflow-hidden">
         {catchUpLoading && <CatchUpLoader />}
         {!catchUpLoading && catchUpData?.total_missed > 0 && (
-          <CatchUpBanner data={catchUpData} onDismiss={() => setCatchUpData(null)} />
+          <CatchUpBanner
+            data={catchUpData}
+            onDismiss={() => setCatchUpData(null)}
+            onNavigate={(groupId, groupName) => {
+              setActiveConversation({ id: groupId, name: groupName, isGroup: true })
+              setCatchUpData(null)
+            }}
+          />
         )}
         <div className="flex-1 flex overflow-hidden">
         <ChatWindow

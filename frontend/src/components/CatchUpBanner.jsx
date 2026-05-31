@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Sparkles, X, ChevronDown, ChevronUp, Loader2 } from 'lucide-react'
 
-export default function CatchUpBanner({ data, onDismiss }) {
+export default function CatchUpBanner({ data, onDismiss, onNavigate }) {
   const [expanded, setExpanded] = useState(false)
 
   if (!data || data.total_missed === 0) return null
@@ -52,7 +52,14 @@ export default function CatchUpBanner({ data, onDismiss }) {
             <SummaryCard label="Direct messages" count={dmCount} summary={dmSummary} color="violet" />
           )}
           {groups.map(([name, info]) => (
-            <SummaryCard key={name} label={name} count={info.count} summary={info.summary} color="indigo" />
+            <SummaryCard
+              key={name}
+              label={name}
+              count={info.count}
+              summary={info.summary}
+              color="indigo"
+              onClick={() => onNavigate?.(info.group_id, name)}
+            />
           ))}
         </div>
       )}
@@ -60,15 +67,19 @@ export default function CatchUpBanner({ data, onDismiss }) {
   )
 }
 
-function SummaryCard({ label, count, summary, color }) {
+function SummaryCard({ label, count, summary, color, onClick }) {
   const colors = {
     indigo: 'bg-indigo-50 border-indigo-100 text-indigo-700',
     violet: 'bg-violet-50 border-violet-100 text-violet-700',
   }
   return (
-    <div className={`rounded-lg border p-2.5 ${colors[color]}`}>
-      <p className="text-xs font-semibold mb-1">
-        {label} <span className="font-normal opacity-60">· {count} new</span>
+    <div
+      className={`rounded-lg border p-2.5 ${colors[color]} ${onClick ? 'cursor-pointer hover:brightness-95 transition-all' : ''}`}
+      onClick={onClick}
+    >
+      <p className="text-xs font-semibold mb-1 flex items-center justify-between">
+        <span>{label} <span className="font-normal opacity-60">· {count} new</span></span>
+        {onClick && <span className="text-xs opacity-50">→ Open</span>}
       </p>
       <p className="text-xs text-slate-600 leading-relaxed">{summary}</p>
     </div>

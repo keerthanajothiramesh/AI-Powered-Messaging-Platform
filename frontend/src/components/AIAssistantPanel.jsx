@@ -18,7 +18,7 @@ export default function AIAssistantPanel({ onClose }) {
     const text = input.trim()
     if (!text || loading) return
     setInput('')
-    setMessages((m) => [...m, { role: 'user', text }])
+    setMessages((m) => [...m, { role: 'user', text, ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }])
     setLoading(true)
     try {
       const res = await client.post('/ai/chat', { message: text })
@@ -26,6 +26,7 @@ export default function AIAssistantPanel({ onClose }) {
         role: 'bot',
         text: res.data.text,
         toolCalls: res.data.tool_calls || [],
+        ts: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       }])
     } catch {
       setMessages((m) => [...m, { role: 'bot', text: 'Sorry, something went wrong. Please try again.', toolCalls: [] }])
@@ -73,6 +74,7 @@ export default function AIAssistantPanel({ onClose }) {
               }`}
               style={msg.role === 'user' ? { background: 'linear-gradient(135deg, #6366f1, #7c3aed)' } : {}}>
                 <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.text}</p>
+                {msg.ts && <p className={`text-xs mt-1 ${msg.role === 'user' ? 'text-white/60 text-right' : 'text-slate-400'}`}>{msg.ts}</p>}
               </div>
               {msg.toolCalls?.length > 0 && (
                 <div className="mt-2 space-y-1">
@@ -152,9 +154,19 @@ function ToolCallCard({ toolCall }) {
         <div className="px-3 pb-2 space-y-1">
           {Array.isArray(toolCall.result)
             ? toolCall.result.slice(0, 3).map((r, i) => (
-                <p key={i} className="text-xs text-slate-600 bg-indigo-50/50 rounded-lg p-1.5 truncate">
-                  {r.content || JSON.stringify(r).slice(0, 80)}
-                </p>
+                <div key={i} className="text-xs text-slate-600 bg-indigo-50/50 rounded-lg p-1.5">
+                  <p className="truncate">{r.content || JSON.stringify(r).slice(0, 80)}</p>
+                  {r.media_url && (
+                    <a
+                      href={r.media_url.startsWith('http') ? r.media_url : `${import.meta.env.VITE_API_URL || 'http://localhost:8000'}${r.media_url}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 mt-1 text-indigo-600 font-semibold hover:underline"
+                    >
+                      📎 Open {r.media_type || 'file'}
+                    </a>
+                  )}
+                </div>
               ))
             : <p className="text-xs text-slate-600">{toolCall.result?.summary || JSON.stringify(toolCall.result).slice(0, 100)}</p>
           }
