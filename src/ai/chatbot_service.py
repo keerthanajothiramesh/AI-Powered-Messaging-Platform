@@ -1,8 +1,41 @@
+import re
 from typing import List, Dict, Any, Optional
 from src.common.logger import get_logger
 from src.ai.gemini_client import generate_with_tools, generate_text
 
 logger = get_logger(__name__)
+
+# ─── Input guardrails ─────────────────────────────────────────────────────────
+
+_BLOCKED_PATTERNS = [
+    r"\b(ignore|forget|disregard)\s+(all\s+)?(previous|prior|above)\s+(instructions?|prompts?|rules?)\b",
+    r"\bpretend\s+(you\s+are|to\s+be)\b",
+    r"\bjailbreak\b",
+    r"\bdan\s+mode\b",
+    r"\bact\s+as\s+(an?\s+)?(evil|unfiltered|unrestricted)\b",
+    r"<(script|iframe|object|embed)[^>]*>",
+    r"\bdrop\s+table\b",
+    r"\bexec\s*\(",
+]
+_BLOCKED_RE = re.compile("|".join(_BLOCKED_PATTERNS), re.IGNORECASE)
+
+_MAX_INPUT_LEN = 2000
+
+_BLOCKED_RESPONSE = (
+    "I can only help with searching messages, summarising conversations, "
+    "and looking up chat history. Please ask me something related to that."
+)
+
+
+def _moderate_input(text: str) -> str | None:
+    """Return a rejection reason string if input should be blocked, else None."""
+    if len(text) > _MAX_INPUT_LEN:
+        return "Input too long."
+    if _BLOCKED_RE.search(text):
+        logger.warning("moderation_blocked", snippet=text[:80])
+        return _BLOCKED_RESPONSE
+    return None
+
 
 SYSTEM_PROMPT = """You are an intelligent messaging assistant for an AI-powered chat platform.
 
@@ -77,6 +110,10 @@ class ChatbotSession:
         self.history: List[Dict] = []
 
     async def chat(self, message: str) -> Dict[str, Any]:
+        rejection = _moderate_input(message)
+        if rejection:
+            return {"text": rejection, "tool_calls": [], "history_length": len(self.history)}
+
         self.history.append({"role": "user", "content": message})
 
         response = await generate_with_tools(

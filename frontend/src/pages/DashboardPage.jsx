@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageSquare, LogOut } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
@@ -11,6 +11,7 @@ import GroupModal from '../components/GroupModal'
 import SettingsModal from '../components/SettingsModal'
 import UserInfoModal from '../components/UserInfoModal'
 import SharedMediaModal from '../components/SharedMediaModal'
+import CatchUpBanner, { CatchUpLoader } from '../components/CatchUpBanner'
 import client from '../api/client'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
@@ -31,6 +32,17 @@ export default function DashboardPage() {
   // Info popup and shared media modal
   const [infoUserId, setInfoUserId] = useState(null)
   const [showSharedMedia, setShowSharedMedia] = useState(false)
+
+  // Catch-up banner
+  const [catchUpData, setCatchUpData] = useState(null)
+  const [catchUpLoading, setCatchUpLoading] = useState(true)
+
+  useEffect(() => {
+    client.post('/ai/catchup', { hours_offline: 24 })
+      .then((r) => setCatchUpData(r.data))
+      .catch(() => {})
+      .finally(() => setCatchUpLoading(false))
+  }, [])
 
   const { activeConversation, setActiveConversation } = useChatStore()
 
@@ -89,13 +101,19 @@ export default function DashboardPage() {
       </aside>
 
       {/* Chat area */}
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden">
+        {catchUpLoading && <CatchUpLoader />}
+        {!catchUpLoading && catchUpData?.total_missed > 0 && (
+          <CatchUpBanner data={catchUpData} onDismiss={() => setCatchUpData(null)} />
+        )}
+        <div className="flex-1 flex overflow-hidden">
         <ChatWindow
           onRightTabChange={setRightTab}
           activeRightTab={rightTab}
           onInfoOpen={handleInfoOpen}
           onSharedOpen={handleSharedOpen}
         />
+        </div>
       </main>
 
       {/* Right panel — always AI-focused */}
