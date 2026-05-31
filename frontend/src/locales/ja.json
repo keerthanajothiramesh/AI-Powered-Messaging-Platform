@@ -1,0 +1,81 @@
+{
+  "app": {
+    "name": "AIメッセージングプラットフォーム",
+    "tagline": "AIを活用"
+  },
+  "auth": {
+    "signIn": "サインイン",
+    "createAccount": "アカウント作成",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "displayName": "表示名",
+    "language": "言語設定",
+    "loginSuccess": "おかえりなさい！",
+    "registerSuccess": "アカウントが作成されました！",
+    "logout": "ログアウト"
+  },
+  "chat": {
+    "typeMessage": "メッセージを入力...",
+    "send": "送信",
+    "online": "オンライン",
+    "offline": "オフライン",
+    "away": "離席中",
+    "delivered": "配信済み",
+    "read": "既読",
+    "sent": "送信済み",
+    "groupChat": "グループチャット",
+    "directMessage": "ダイレクトメッセージ",
+    "noMessages": "まだメッセージはありません。会話を始めましょう！",
+    "loading": "メッセージを読み込み中...",
+    "members": "メンバー"
+  },
+  "search": {
+    "placeholder": "メッセージを検索...",
+    "aiSearch": "AI検索",
+    "keyword": "キーワード",
+    "filters": "フィルター",
+    "results": "件の結果",
+    "noResults": "結果が見つかりませんでした",
+    "searching": "検索中..."
+  },
+  "ai": {
+    "assistant": "AIアシスタント",
+    "placeholder": "チャットについて何でも聞いてください...",
+    "thinking": "考え中...",
+    "examples": {
+      "search": "Priyaが期限を共有したメッセージを探して",
+      "summary": "プロジェクト立ち上げチームの過去2週間を要約して",
+      "catchup": "オフライン中に何を見逃しましたか？",
+      "media": "チームチャットの改装画像を表示して"
+    }
+  },
+  "groups": {
+    "create": "グループ作成",
+    "name": "グループ名",
+    "addMembers": "メンバーを追加",
+    "aiSummary": "AI要約",
+    "members": "メンバー",
+    "leave": "グループを退出"
+  },
+  "media": {
+    "gallery": "メディアギャラリー",
+    "images": "画像",
+    "videos": "動画",
+    "voice": "音声",
+    "all": "すべて"
+  },
+  "notifications": {
+    "title": "通知",
+    "markAllRead": "すべて既読にする",
+    "noNotifications": "通知はありません"
+  },
+  "common": {
+    "loading": "読み込み中...",
+    "error": "エラーが発生しました",
+    "retry": "再試行",
+    "cancel": "キャンセル",
+    "save": "保存",
+    "delete": "削除",
+    "close": "閉じる"
+  }
+}

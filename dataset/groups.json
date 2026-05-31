@@ -1,0 +1,227 @@
+[
+  {
+    "group_id": "68394d58-3096-4269-ab11-de811acb7d86",
+    "group_name": "Project Launch Team",
+    "description": "Group for Project Launch Team discussions",
+    "avatar_url": null,
+    "created_by": "5a0c5a41-710b-4467-9188-2d5e0a8dc98e",
+    "max_participants": 100,
+    "created_at": "2025-08-08T10:39:04.117774+00:00"
+  },
+  {
+    "group_id": "389a2042-e8a8-4a54-ace3-b3bbe27f7132",
+    "group_name": "Engineering Squad",
+    "description": "Group for Engineering Squad discussions",
+    "avatar_url": null,
+    "created_by": "6f9cc5ef-82d9-49ef-b52d-ba4bd63bb20e",
+    "max_participants": 100,
+    "created_at": "2025-12-16T10:39:04.117895+00:00"
+  },
+  {
+    "group_id": "60ac1253-6164-480f-8824-310b5a89674f",
+    "group_name": "Design Team",
+    "description": "Group for Design Team discussions",
+    "avatar_url": null,
+    "created_by": "312a2ae1-1408-4aaf-b6d4-c22bc2a89778",
+    "max_participants": 100,
+    "created_at": "2025-11-11T10:39:04.117961+00:00"
+  },
+  {
+    "group_id": "6eca555c-f8d2-4f97-a537-5c6ca1f57198",
+    "group_name": "Product Management",
+    "description": "Group for Product Management discussions",
+    "avatar_url": null,
+    "created_by": "7fe5f4ae-5873-44b2-85d5-3b0f41388995",
+    "max_participants": 100,
+    "created_at": "2025-10-02T10:39:04.117996+00:00"
+  },
+  {
+    "group_id": "a24865d1-2b8e-409b-a1ac-0b9420a7f404",
+    "group_name": "Office Announcements",
+    "description": "Group for Office Announcements discussions",
+    "avatar_url": null,
+    "created_by": "70d55fcc-8c7d-41bf-997a-511a7f0e955f",
+    "max_participants": 100,
+    "created_at": "2025-08-16T10:39:04.118057+00:00"
+  },
+  {
+    "group_id": "4c7ad0df-14c9-45ca-a6c1-228a62b79a19",
+    "group_name": "HR Updates",
+    "description": "Group for HR Updates discussions",
+    "avatar_url": null,
+    "created_by": "21a9540a-8b72-46a2-927c-64aab911432f",
+    "max_participants": 100,
+    "created_at": "2025-08-20T10:39:04.118112+00:00"
+  },
+  {
+    "group_id": "43c97730-ab75-49cf-a765-c954c34ea7e4",
+    "group_name": "Sales Team",
+    "description": "Group for Sales Team discussions",
+    "avatar_url": null,
+    "created_by": "138f821f-8ab7-4c73-8eeb-ca024cf25fb1",
+    "max_participants": 100,
+    "created_at": "2026-02-05T10:39:04.118188+00:00"
+  },
+  {
+    "group_id": "e47173bb-5544-452f-bb45-f8c076a6a402",
+    "group_name": "Marketing Team",
+    "description": "Group for Marketing Team discussions",
+    "avatar_url": null,
+    "created_by": "0f81d433-09bb-4120-b2b9-41fed2484ebd",
+    "max_participants": 100,
+    "created_at": "2025-06-26T10:39:04.118272+00:00"
+  },
+  {
+    "group_id": "edf28b6c-37f9-4cc8-95ea-8041240f54fd",
+    "group_name": "DevOps Channel",
+    "description": "Group for DevOps Channel discussions",
+    "avatar_url": null,
+    "created_by": "f359e08a-8cef-46c1-9fa4-84f8227e875d",
+    "max_participants": 100,
+    "created_at": "2025-10-18T10:39:04.118322+00:00"
+  },
+  {
+    "group_id": "a271954a-e746-42bf-a72c-4a938ce0ecb6",
+    "group_name": "QA Team",
+    "description": "Group for QA Team discussions",
+    "avatar_url": null,
+    "created_by": "5c3430fa-9a85-49b3-8aad-d9747d91aa14",
+    "max_participants": 100,
+    "created_at": "2026-02-12T10:39:04.118359+00:00"
+  },
+  {
+    "group_id": "5db2afc6-073e-4614-be2a-fd58b810a8ec",
+    "group_name": "Leadership Updates",
+    "description": "Group for Leadership Updates discussions",
+    "avatar_url": null,
+    "created_by": "d5cf2954-c298-4013-b85c-85616828846a",
+    "max_participants": 100,
+    "created_at": "2025-11-12T10:39:04.118443+00:00"
+  },
+  {
+    "group_id": "15797f95-b5f7-475a-90ef-423c39197d4e",
+    "group_name": "Finance Team",
+    "description": "Group for Finance Team discussions",
+    "avatar_url": null,
+    "created_by": "126362bd-f571-47d0-aabe-b677f5a57c79",
+    "max_participants": 100,
+    "created_at": "2025-08-17T10:39:04.118505+00:00"
+  },
+  {
+    "group_id": "f96e56f5-ebcb-4a5c-a6ba-63d3cb001ca1",
+    "group_name": "Support Team",
+    "description": "Group for Support Team discussions",
+    "avatar_url": null,
+    "created_by": "fd82b524-0cb1-472f-bb41-152f0eb864d1",
+    "max_participants": 100,
+    "created_at": "2025-12-31T10:39:04.118546+00:00"
+  },
+  {
+    "group_id": "aa544a39-a9b7-4479-9def-3f96c1618434",
+    "group_name": "Data Science Guild",
+    "description": "Group for Data Science Guild discussions",
+    "avatar_url": null,
+    "created_by": "385183d1-5d36-47e2-a47b-c68d227c2c7c",
+    "max_participants": 100,
+    "created_at": "2026-03-23T10:39:04.118639+00:00"
+  },
+  {
+    "group_id": "ef3ee298-a014-4c2c-b3c6-390e90356c2e",
+    "group_name": "Frontend Developers",
+    "description": "Group for Frontend Developers discussions",
+    "avatar_url": null,
+    "created_by": "e39e2268-5e60-4fdc-85a2-ad97215f913a",
+    "max_participants": 100,
+    "created_at": "2025-12-07T10:39:04.118707+00:00"
+  },
+  {
+    "group_id": "d74fdd12-6736-4b50-a778-6cc0c8154cd7",
+    "group_name": "Backend Developers",
+    "description": "Group for Backend Developers discussions",
+    "avatar_url": null,
+    "created_by": "4512fae3-b029-4b39-8915-61c984f65129",
+    "max_participants": 100,
+    "created_at": "2025-07-30T10:39:04.118786+00:00"
+  },
+  {
+    "group_id": "e830718a-6855-4b50-ad75-106ab531870b",
+    "group_name": "Mobile Team",
+    "description": "Group for Mobile Team discussions",
+    "avatar_url": null,
+    "created_by": "078d64b3-8153-4156-87be-1870f95d3a4a",
+    "max_participants": 100,
+    "created_at": "2026-03-25T10:39:04.118847+00:00"
+  },
+  {
+    "group_id": "d3fcc5da-78c6-48e6-a6a5-563648099aee",
+    "group_name": "Security Team",
+    "description": "Group for Security Team discussions",
+    "avatar_url": null,
+    "created_by": "53ca0274-c848-40a5-ba41-712e16c3fa3a",
+    "max_participants": 100,
+    "created_at": "2026-01-19T10:39:04.118907+00:00"
+  },
+  {
+    "group_id": "0a3f9205-0265-482d-b974-ad2af5c29df7",
+    "group_name": "Infrastructure Team",
+    "description": "Group for Infrastructure Team discussions",
+    "avatar_url": null,
+    "created_by": "613b963c-4302-4893-8fbd-678d7bc21982",
+    "max_participants": 100,
+    "created_at": "2026-02-05T10:39:04.118968+00:00"
+  },
+  {
+    "group_id": "3989f4bd-72fc-4e27-bd89-63895310f301",
+    "group_name": "Innovation Lab",
+    "description": "Group for Innovation Lab discussions",
+    "avatar_url": null,
+    "created_by": "749e903c-a7ac-4741-9c26-ecd8917462b0",
+    "max_participants": 100,
+    "created_at": "2025-12-08T10:39:04.119038+00:00"
+  },
+  {
+    "group_id": "b356eb7f-8c75-47a7-96d7-788f75282a2b",
+    "group_name": "Customer Success",
+    "description": "Group for Customer Success discussions",
+    "avatar_url": null,
+    "created_by": "d341cee7-42bb-4d0b-84b4-ea0fb51c2bd5",
+    "max_participants": 100,
+    "created_at": "2025-10-14T10:39:04.119088+00:00"
+  },
+  {
+    "group_id": "fece4166-8d73-4b79-98a4-f1d9d32b0d0f",
+    "group_name": "Legal & Compliance",
+    "description": "Group for Legal & Compliance discussions",
+    "avatar_url": null,
+    "created_by": "5fa8d8e4-7ab7-497b-bdb5-f184608b60e0",
+    "max_participants": 100,
+    "created_at": "2025-08-01T10:39:04.119164+00:00"
+  },
+  {
+    "group_id": "5fe225f7-450c-4994-8723-f6ef1c14407e",
+    "group_name": "Research Team",
+    "description": "Group for Research Team discussions",
+    "avatar_url": null,
+    "created_by": "61967821-04e6-4bb2-9c67-692924e7abc6",
+    "max_participants": 100,
+    "created_at": "2025-10-18T10:39:04.119214+00:00"
+  },
+  {
+    "group_id": "ce1d5993-37ac-45cb-864c-2942b25956b8",
+    "group_name": "Analytics Team",
+    "description": "Group for Analytics Team discussions",
+    "avatar_url": null,
+    "created_by": "2313ac67-83bb-4757-978b-b823bf16f642",
+    "max_participants": 100,
+    "created_at": "2025-10-08T10:39:04.119272+00:00"
+  },
+  {
+    "group_id": "24dd650b-0731-49e0-9565-25e85771ac08",
+    "group_name": "Executive Team",
+    "description": "Group for Executive Team discussions",
+    "avatar_url": null,
+    "created_by": "418dc029-060b-492b-ad2c-7d9f9c21f860",
+    "max_participants": 100,
+    "created_at": "2025-07-08T10:39:04.119301+00:00"
+  }
+]

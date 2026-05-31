@@ -1,0 +1,81 @@
+{
+  "app": {
+    "name": "AI Messaging Platform",
+    "tagline": "Powered by AI"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "createAccount": "Create Account",
+    "email": "Email",
+    "password": "Password",
+    "displayName": "Display Name",
+    "language": "Language Preference",
+    "loginSuccess": "Welcome back!",
+    "registerSuccess": "Account created!",
+    "logout": "Logout"
+  },
+  "chat": {
+    "typeMessage": "Type a message...",
+    "send": "Send",
+    "online": "Online",
+    "offline": "Offline",
+    "away": "Away",
+    "delivered": "Delivered",
+    "read": "Read",
+    "sent": "Sent",
+    "groupChat": "Group Chat",
+    "directMessage": "Direct Message",
+    "noMessages": "No messages yet. Start the conversation!",
+    "loading": "Loading messages...",
+    "members": "Members"
+  },
+  "search": {
+    "placeholder": "Search messages...",
+    "aiSearch": "AI Search",
+    "keyword": "Keyword",
+    "filters": "Filters",
+    "results": "results",
+    "noResults": "No results found",
+    "searching": "Searching..."
+  },
+  "ai": {
+    "assistant": "AI Assistant",
+    "placeholder": "Ask me anything about your chats...",
+    "thinking": "Thinking...",
+    "examples": {
+      "search": "Find message where Priya shared deadline",
+      "summary": "Summarise Project Launch Team last 2 weeks",
+      "catchup": "What did I miss while offline?",
+      "media": "Show renovation images from team chat"
+    }
+  },
+  "groups": {
+    "create": "Create Group",
+    "name": "Group Name",
+    "addMembers": "Add Members",
+    "aiSummary": "AI Summary",
+    "members": "Members",
+    "leave": "Leave Group"
+  },
+  "media": {
+    "gallery": "Media Gallery",
+    "images": "Images",
+    "videos": "Videos",
+    "voice": "Voice",
+    "all": "All"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all read",
+    "noNotifications": "No notifications"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "retry": "Retry",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "close": "Close"
+  }
+}
