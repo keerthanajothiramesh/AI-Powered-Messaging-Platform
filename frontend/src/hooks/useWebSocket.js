@@ -48,9 +48,11 @@ export function useWebSocket() {
   const handleEvent = useCallback((payload) => {
     const { type, data } = payload
     if (type === 'message') {
-      const convId = data.group_id || data.sender_id || data.receiver_id
+      const currentUserId = useAuthStore.getState().user?.user_id
+      const convId = data.group_id
+        || (data.sender_id === currentUserId ? data.receiver_id : data.sender_id)
       addMessage(convId, data)
-      if (data.sender_id !== useChatStore.getState().activeConversation?.id) {
+      if (convId !== useChatStore.getState().activeConversation?.id) {
         toast(`New message from ${data.sender_id?.slice(0, 8)}…`, { icon: '💬' })
       }
     } else if (type === 'group_added') {
