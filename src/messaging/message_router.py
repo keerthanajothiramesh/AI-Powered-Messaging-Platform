@@ -273,15 +273,19 @@ async def suggest_replies(
         f"{context_block}"
         f"Latest message received: \"{data.message}\"\n\n"
         "Generate exactly 3 short, natural reply suggestions (each under 10 words). "
-        "Return ONLY a JSON array of 3 strings, no explanation or markdown."
+        "Return ONLY a raw JSON array of 3 strings — no markdown, no code fences, no explanation. "
+        'Example output: ["Sure!", "Let me check.", "Sounds good!"]'
     )
 
     try:
-        raw = await generate_text(prompt, temperature=0.6, max_tokens=120)
-        match = re.search(r'\[.*?\]', raw, re.DOTALL)
+        raw = await generate_text(prompt, temperature=0.6, max_tokens=150)
+        # Strip markdown code fences if Gemini wraps the output
+        raw = re.sub(r"```[a-z]*\n?", "", raw).strip()
+        # Greedy match to capture the full array even if items contain punctuation
+        match = re.search(r'\[.*\]', raw, re.DOTALL)
         if match:
             suggestions = json.loads(match.group())
-            suggestions = [str(s).strip() for s in suggestions if s][:3]
+            suggestions = [str(s).strip() for s in suggestions if str(s).strip()][:3]
         else:
             suggestions = []
     except Exception as e:

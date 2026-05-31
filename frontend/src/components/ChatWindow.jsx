@@ -33,6 +33,7 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
   const [loading, setLoading] = useState(false)
   const [recording, setRecording] = useState(false)
   const [suggestions, setSuggestions] = useState([])
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const bottomRef = useRef(null)
@@ -67,14 +68,17 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
   }, [convMessages.length])
 
   useEffect(() => {
-    if (!convId || convMessages.length === 0) { setSuggestions([]); return }
+    if (!convId || convMessages.length === 0) { setSuggestions([]); setSuggestionsLoading(false); return }
     const last = convMessages[convMessages.length - 1]
-    if (last.sender_id === user?.user_id) { setSuggestions([]); return }
-    if (last.media_type !== 'text' || last.deleted) { setSuggestions([]); return }
+    if (last.sender_id === user?.user_id) { setSuggestions([]); setSuggestionsLoading(false); return }
+    if (last.media_type !== 'text' || last.deleted) { setSuggestions([]); setSuggestionsLoading(false); return }
     const context = convMessages.slice(-5, -1).map((m) => m.content)
+    setSuggestions([])
+    setSuggestionsLoading(true)
     client.post('/messages/suggest-replies', { message: last.content, context })
       .then((r) => setSuggestions(r.data.suggestions || []))
       .catch(() => setSuggestions([]))
+      .finally(() => setSuggestionsLoading(false))
   }, [convMessages.length, convId])
 
   useEffect(() => {
@@ -313,18 +317,29 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
       </div>
 
       {/* Reply suggestions */}
-      {suggestions.length > 0 && !input && (
-        <div className="px-4 pb-2 flex gap-2 flex-wrap flex-shrink-0">
-          {suggestions.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => { setInput(s); setSuggestions([]) }}
-              className="px-3 py-1.5 text-indigo-600 border border-indigo-200 rounded-full text-xs font-semibold transition-all shadow-sm hover:shadow-md"
-              style={{ background: 'linear-gradient(135deg, #eef2ff, #ede9fe)' }}
-            >
-              {s}
-            </button>
-          ))}
+      {!input && (suggestionsLoading || suggestions.length > 0) && (
+        <div className="px-4 pb-2 flex gap-2 flex-wrap items-center flex-shrink-0">
+          {suggestionsLoading ? (
+            // Shimmer placeholders while Gemini responds
+            [72, 96, 80].map((w, i) => (
+              <div
+                key={i}
+                className="h-7 rounded-full animate-pulse"
+                style={{ width: `${w}px`, background: 'linear-gradient(135deg, #e0e7ff, #ede9fe)' }}
+              />
+            ))
+          ) : (
+            suggestions.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => { setInput(s); setSuggestions([]) }}
+                className="px-3 py-1.5 text-indigo-600 border border-indigo-200 rounded-full text-xs font-semibold transition-all shadow-sm hover:shadow-md active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #eef2ff, #ede9fe)' }}
+              >
+                {s}
+              </button>
+            ))
+          )}
         </div>
       )}
 
