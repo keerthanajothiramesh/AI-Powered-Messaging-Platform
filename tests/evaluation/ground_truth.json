@@ -1,0 +1,65 @@
+{
+  "version": "1.0",
+  "description": "Ground truth dataset for evaluating search precision and summarisation quality on the synthetic 60k-message corpus.",
+  "search": [
+    {
+      "id": "s1",
+      "query": "project deadline",
+      "relevant_keywords": ["deadline", "march", "due date", "deliverable", "submit"],
+      "min_precision_at_5": 0.4,
+      "notes": "Should surface messages about project submission deadlines"
+    },
+    {
+      "id": "s2",
+      "query": "office renovation plans",
+      "relevant_keywords": ["renovation", "office", "floor", "construction", "contractor"],
+      "min_precision_at_5": 0.3,
+      "notes": "Should surface renovation discussion messages"
+    },
+    {
+      "id": "s3",
+      "query": "quarterly budget review",
+      "relevant_keywords": ["budget", "quarterly", "finance", "review", "expenses"],
+      "min_precision_at_5": 0.3,
+      "notes": "Finance-related message retrieval"
+    },
+    {
+      "id": "s4",
+      "query": "team meeting schedule",
+      "relevant_keywords": ["meeting", "schedule", "agenda", "standup", "sync"],
+      "min_precision_at_5": 0.4,
+      "notes": "Meeting coordination messages"
+    },
+    {
+      "id": "s5",
+      "query": "product launch announcement",
+      "relevant_keywords": ["launch", "product", "release", "announce", "go-live"],
+      "min_precision_at_5": 0.3,
+      "notes": "Product launch related messages"
+    }
+  ],
+  "summarisation": [
+    {
+      "id": "sum1",
+      "context": {
+        "group_name": "Project Launch Team",
+        "days": 14
+      },
+      "expected_topics": ["project", "launch", "deadline", "team"],
+      "min_topic_coverage": 0.5,
+      "judge_min_score": 6.0,
+      "notes": "14-day summary of the main project group"
+    },
+    {
+      "id": "sum2",
+      "context": {
+        "group_name": "Office Renovation",
+        "days": 7
+      },
+      "expected_topics": ["renovation", "office", "plan"],
+      "min_topic_coverage": 0.5,
+      "judge_min_score": 6.0,
+      "notes": "7-day summary of renovation group"
+    }
+  ]
+}
