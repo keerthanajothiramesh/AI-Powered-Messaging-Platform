@@ -1,13 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, Users, MessageSquare, Plus } from 'lucide-react'
+import { format, isToday, isYesterday } from 'date-fns'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
 import client from '../api/client'
 
+function formatLastSeen(ts) {
+  if (!ts) return 'offline'
+  const d = new Date(ts)
+  if (isToday(d)) return `last seen at ${format(d, 'HH:mm')}`
+  if (isYesterday(d)) return 'last seen yesterday'
+  return `last seen ${format(d, 'dd MMM')}`
+}
+
 export default function ConversationList({ onCreateGroup }) {
   const { t } = useTranslation()
-  const { groups, setGroups, setActiveConversation, activeConversation } = useChatStore()
+  const { groups, setGroups, setActiveConversation, activeConversation, onlineUsers, lastSeen } = useChatStore()
   const { user } = useAuthStore()
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -89,29 +98,35 @@ export default function ConversationList({ onCreateGroup }) {
         {activeTab === 'dms' && (
           <>
             {search.length >= 2
-              ? searchResults.map((u) => (
-                  <ConvItem
-                    key={u.user_id}
-                    id={u.user_id}
-                    name={u.display_name}
-                    subtitle={u.user_presence}
-                    isActive={activeConversation?.id === u.user_id}
-                    presence={u.user_presence}
-                    onClick={() => setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false })}
-                  />
-                ))
-              : dmConversations.length > 0
-                ? dmConversations.map((u) => (
+              ? searchResults.map((u) => {
+                  const isOnline = onlineUsers.has(u.user_id)
+                  return (
                     <ConvItem
                       key={u.user_id}
                       id={u.user_id}
                       name={u.display_name}
-                      subtitle={u.last_message || u.user_presence}
+                      subtitle={isOnline ? 'Online' : formatLastSeen(lastSeen[u.user_id] || u.last_seen)}
                       isActive={activeConversation?.id === u.user_id}
-                      presence={u.user_presence}
+                      isOnline={isOnline}
                       onClick={() => setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false })}
                     />
-                  ))
+                  )
+                })
+              : dmConversations.length > 0
+                ? dmConversations.map((u) => {
+                    const isOnline = onlineUsers.has(u.user_id)
+                    return (
+                      <ConvItem
+                        key={u.user_id}
+                        id={u.user_id}
+                        name={u.display_name}
+                        subtitle={u.last_message || (isOnline ? 'Online' : formatLastSeen(lastSeen[u.user_id] || u.last_seen))}
+                        isActive={activeConversation?.id === u.user_id}
+                        isOnline={isOnline}
+                        onClick={() => setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false })}
+                      />
+                    )
+                  })
                 : (
                     <p className="text-center text-xs text-gray-400 p-4">
                       Search for a user to start a conversation
@@ -125,7 +140,7 @@ export default function ConversationList({ onCreateGroup }) {
   )
 }
 
-function ConvItem({ id, name, subtitle, isGroup, isActive, presence, onClick }) {
+function ConvItem({ id, name, subtitle, isGroup, isActive, isOnline, onClick }) {
   const initials = name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
   return (
     <button
@@ -137,12 +152,12 @@ function ConvItem({ id, name, subtitle, isGroup, isActive, presence, onClick }) 
           {initials}
         </div>
         {!isGroup && (
-          <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${presence === 'online' ? 'bg-green-500' : 'bg-gray-400'}`} />
+          <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white transition-colors ${isOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
         )}
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-gray-900 truncate">{name}</p>
-        <p className="text-xs text-gray-500 truncate">{subtitle}</p>
+        <p className={`text-xs truncate ${isOnline ? 'text-green-500 font-medium' : 'text-gray-400'}`}>{subtitle}</p>
       </div>
     </button>
   )

@@ -6,6 +6,7 @@ export const useChatStore = create((set, get) => ({
   groups: [],
   messages: {},
   onlineUsers: new Set(),
+  lastSeen: {},
 
   setActiveConversation: (conv) => set({ activeConversation: conv }),
   setConversations: (list) => set({ conversations: list }),
@@ -55,10 +56,13 @@ export const useChatStore = create((set, get) => ({
   setUserOnline: (userId) =>
     set((s) => ({ onlineUsers: new Set([...s.onlineUsers, userId]) })),
 
-  setUserOffline: (userId) =>
+  setUserOffline: (userId, lastSeenAt) =>
     set((s) => {
       const next = new Set(s.onlineUsers)
       next.delete(userId)
-      return { onlineUsers: next }
+      return {
+        onlineUsers: next,
+        lastSeen: { ...s.lastSeen, [userId]: lastSeenAt || new Date().toISOString() },
+      }
     }),
 }))

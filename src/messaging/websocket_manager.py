@@ -55,6 +55,12 @@ class ConnectionManager:
                 delivered_to.append(user_id)
         return delivered_to
 
+    async def broadcast_to_all(self, message: dict, exclude_user: Optional[str] = None) -> None:
+        for uid in list(self.active_connections.keys()):
+            if uid == exclude_user:
+                continue
+            await self.send_to_user(uid, message)
+
     def get_online_users(self) -> List[str]:
         return list(self.active_connections.keys())
 

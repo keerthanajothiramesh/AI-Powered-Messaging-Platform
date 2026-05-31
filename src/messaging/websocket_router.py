@@ -25,6 +25,12 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, token: str = Qu
     manager = get_connection_manager()
     await manager.connect(user_id, websocket)
 
+    # Notify all connected users that this user came online
+    await manager.broadcast_to_all(
+        {"type": "user_online", "data": {"user_id": user_id}},
+        exclude_user=user_id,
+    )
+
     pool = get_pg_pool()
     async with pool.acquire() as conn:
         await conn.execute(
@@ -88,6 +94,12 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, token: str = Qu
                 await manager.send_to_user(user_id, {"type": "pong"})
 
     except WebSocketDisconnect:
+        last_seen_ts = datetime.now(timezone.utc).isoformat()
+        # Broadcast offline event before removing from active connections
+        await manager.broadcast_to_all(
+            {"type": "user_offline", "data": {"user_id": user_id, "last_seen": last_seen_ts}},
+            exclude_user=user_id,
+        )
         manager.disconnect(user_id)
         pool2 = get_pg_pool()
         async with pool2.acquire() as conn:

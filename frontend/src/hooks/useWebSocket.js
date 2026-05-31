@@ -77,6 +77,10 @@ export function useWebSocket() {
     } else if (type === 'message_read') {
       const active = useChatStore.getState().activeConversation
       if (active) updateMessageStatus(active.id, data.message_id, 'read')
+    } else if (type === 'user_online') {
+      useChatStore.getState().setUserOnline(data.user_id)
+    } else if (type === 'user_offline') {
+      useChatStore.getState().setUserOffline(data.user_id, data.last_seen)
     } else if (type === 'notification') {
       toast(data.body, { icon: '🔔' })
     }

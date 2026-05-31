@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Send, Paperclip, Image, Mic, MicOff, CheckCheck, Check, Eye, Pencil, Trash2, Square } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, isToday, isYesterday } from 'date-fns'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -16,9 +16,18 @@ function resolveMediaUrl(url) {
   return `${API_BASE}${url}`
 }
 
+function formatPresence(isOnline, lastSeenTs) {
+  if (isOnline) return { text: 'Online', green: true }
+  if (!lastSeenTs) return { text: 'Offline', green: false }
+  const d = new Date(lastSeenTs)
+  if (isToday(d)) return { text: `Last seen at ${format(d, 'HH:mm')}`, green: false }
+  if (isYesterday(d)) return { text: 'Last seen yesterday', green: false }
+  return { text: `Last seen ${format(d, 'dd MMM')}`, green: false }
+}
+
 export default function ChatWindow() {
   const { t } = useTranslation()
-  const { activeConversation, messages, setMessages } = useChatStore()
+  const { activeConversation, messages, setMessages, onlineUsers, lastSeen } = useChatStore()
   const { user } = useAuthStore()
   const { sendMessage } = useWebSocket()
   const [input, setInput] = useState('')
@@ -172,12 +181,25 @@ export default function ChatWindow() {
   return (
     <div className="flex-1 flex flex-col bg-white">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3 bg-white shadow-sm">
-        <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold text-sm">
-          {activeConversation.name.slice(0, 2).toUpperCase()}
+        <div className="relative flex-shrink-0">
+          <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-semibold text-sm">
+            {activeConversation.name.slice(0, 2).toUpperCase()}
+          </div>
+          {!activeConversation.isGroup && (
+            <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white transition-colors ${onlineUsers.has(activeConversation.id) ? 'bg-green-500' : 'bg-gray-300'}`} />
+          )}
         </div>
         <div>
           <h2 className="font-semibold text-gray-900">{activeConversation.name}</h2>
-          <p className="text-xs text-gray-500">{activeConversation.isGroup ? t('chat.groupChat') : t('chat.directMessage')}</p>
+          {activeConversation.isGroup ? (
+            <p className="text-xs text-gray-500">{t('chat.groupChat')}</p>
+          ) : (() => {
+            const { text, green } = formatPresence(
+              onlineUsers.has(activeConversation.id),
+              lastSeen[activeConversation.id]
+            )
+            return <p className={`text-xs font-medium ${green ? 'text-green-500' : 'text-gray-400'}`}>{text}</p>
+          })()}
         </div>
       </div>
 
