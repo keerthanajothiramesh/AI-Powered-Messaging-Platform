@@ -77,6 +77,7 @@ async def generate_with_tools(
     prompt: str,
     tools: List[Dict],
     conversation_history: Optional[List[Dict]] = None,
+    system_prompt: Optional[str] = None,
 ) -> Dict[str, Any]:
     if not _model or _circuit_open:
         return {"text": await _local_fallback(prompt), "tool_calls": []}
@@ -108,7 +109,11 @@ async def generate_with_tools(
                 )
             )
 
-        model_with_tools = genai.GenerativeModel("gemini-2.5-flash", tools=tool_defs)
+        model_with_tools = genai.GenerativeModel(
+            "gemini-2.5-flash",
+            tools=tool_defs,
+            system_instruction=system_prompt if system_prompt else None,
+        )
         history = []
         if conversation_history:
             for msg in conversation_history:

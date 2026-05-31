@@ -29,6 +29,12 @@ class CatchupRequest(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     reset_session: bool = False
+    # Thread / session context
+    session_id: Optional[str] = None
+    conv_id: Optional[str] = None
+    is_group: bool = False
+    conv_name: Optional[str] = None
+    other_user_id: Optional[str] = None
 
 
 @router.post("/search")
@@ -79,10 +85,19 @@ async def catchup_summary(data: CatchupRequest, current_user=Depends(get_current
 
 @router.post("/chat")
 async def chat(data: ChatRequest, current_user=Depends(get_current_user)):
-    if data.reset_session:
-        clear_session(current_user.user_id)
+    sid = data.session_id or data.conv_id or "default"
 
-    session = get_or_create_session(current_user.user_id)
+    if data.reset_session:
+        clear_session(current_user.user_id, sid)
+
+    session = get_or_create_session(
+        user_id=current_user.user_id,
+        session_id=sid,
+        conv_id=data.conv_id,
+        is_group=data.is_group,
+        conv_name=data.conv_name,
+        other_user_id=data.other_user_id,
+    )
     result = await session.chat(data.message)
     return result
 
@@ -90,4 +105,10 @@ async def chat(data: ChatRequest, current_user=Depends(get_current_user)):
 @router.delete("/chat/session")
 async def reset_chat_session(current_user=Depends(get_current_user)):
     clear_session(current_user.user_id)
+    return {"message": "All sessions cleared"}
+
+
+@router.delete("/chat/session/{session_id}")
+async def delete_chat_session(session_id: str, current_user=Depends(get_current_user)):
+    clear_session(current_user.user_id, session_id)
     return {"message": "Session cleared"}

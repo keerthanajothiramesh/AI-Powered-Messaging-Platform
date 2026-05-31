@@ -103,6 +103,55 @@ async def catch_up_summary(user_id: str, offline_since: datetime) -> Dict[str, A
     }
 
 
+DM_SUMMARY_PROMPT = """You are an AI assistant summarising a direct message conversation.
+Provide a concise, structured summary ALWAYS IN ENGLISH (regardless of the original message language):
+- Main topics discussed
+- Key decisions or outcomes
+- Action items (if any)
+- Important dates or deadlines mentioned
+
+Be factual. Use bullet points. Keep it under 300 words. Output in English only."""
+
+
+async def summarise_dm(
+    user_id: str, other_user_id: str, days: int = 14, other_user_name: str = "the other person"
+) -> str:
+    from src.common.database import get_mongo_db
+    db = get_mongo_db()
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+
+    cursor = db.messages.find({
+        "$or": [
+            {"sender_id": user_id, "receiver_id": other_user_id, "group_id": None},
+            {"sender_id": other_user_id, "receiver_id": user_id, "group_id": None},
+        ],
+        "timestamp": {"$gte": since},
+    }).sort("timestamp", 1)
+    messages = await cursor.to_list(length=2000)
+
+    if not messages:
+        return f"No direct messages found with {other_user_name} in the last {days} days."
+
+    logger.info("summarise_dm", user_id=user_id, other_user_id=other_user_id, message_count=len(messages))
+
+    chunks = _chunk_messages(messages, CHUNK_SIZE)
+    chunk_summaries = []
+    for chunk in chunks:
+        text = _format_messages(chunk)
+        prompt = f"Summarise this DM conversation (output in English only):\n\n{text}"
+        summary = await generate_text(prompt, system_prompt=DM_SUMMARY_PROMPT, max_tokens=512)
+        chunk_summaries.append(summary)
+
+    if len(chunk_summaries) == 1:
+        return chunk_summaries[0]
+
+    merge_prompt = (
+        f"Merge these {len(chunk_summaries)} partial DM summaries into one coherent English summary:\n\n"
+        + "\n\n---\n\n".join(chunk_summaries)
+    )
+    return await generate_text(merge_prompt, system_prompt=DM_SUMMARY_PROMPT, max_tokens=1024)
+
+
 async def search_with_ai(query: str, user_id: str, filters: Optional[Dict] = None) -> Dict:
     from src.search.search_service import hybrid_search
     results = await hybrid_search(query, n_results=10, filters=filters or {})

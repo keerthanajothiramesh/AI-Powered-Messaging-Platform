@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Users, Loader2, Sparkles, Search, Bot, Settings,
   Mic, Video, FileText, Pencil, Trash2, Shield, ShieldOff,
-  UserMinus, UserPlus, Check, X, Send,
+  UserMinus, UserPlus, Check, X, Send, Paperclip, MessageSquare, Plus,
 } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
@@ -207,7 +207,13 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
         />
       ) : (
         /* DM: full AI assistant panel */
-        <InlineAIChat key={convId} convName={activeConversation.name} />
+        <InlineAIChat
+          key={convId}
+          convId={convId}
+          convName={activeConversation.name}
+          isGroup={false}
+          otherUserId={convId}
+        />
       )}
     </div>
   )
@@ -408,7 +414,13 @@ function GroupPanel({
       )}
 
       {groupTab === 'ai' && (
-        <InlineAIChat key={`group-${convId}`} convName={convName} />
+        <InlineAIChat
+          key={`group-${convId}`}
+          convId={convId}
+          convName={convName}
+          isGroup={true}
+          otherUserId={null}
+        />
       )}
     </>
   )
@@ -416,56 +428,216 @@ function GroupPanel({
 
 // ─── Inline AI chat (used for DMs always, and Group AI tab) ──────────────────
 
-const STARTER_EXAMPLES = [
-  'Search for messages about deadlines',
-  'What was decided recently?',
-  'Find messages from last week',
-]
+const EMOJIS = ['😊','👍','❤️','🎉','😂','🤔','👏','🙏','💡','✅','⚡','🔥','💯','🚀','📌','✨','🎯','👀','💬','🔍','⭐','📝','🎨','🔔']
 
-function InlineAIChat({ convName }) {
-  const [msgs, setMsgs] = useState([
-    { role: 'bot', text: `Hi! Ask me to search messages, find info, or summarise this conversation.` },
-  ])
+function _makeThread(convName, isGroup) {
+  const ctx = convName
+    ? (isGroup ? `📋 ${convName} group` : `💬 chat with ${convName}`)
+    : 'your conversations'
+  return {
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    name: 'New Thread',
+    messages: [{
+      role: 'bot',
+      text: `Hi! ✨ I'm your AI assistant for ${ctx}. Ask me to search messages, summarise the conversation, or find anything!`,
+    }],
+  }
+}
+
+function InlineAIChat({ convId, convName, isGroup, otherUserId }) {
+  const threadsKey = `aiThreads_${convId || 'global'}`
+
+  const [threads, setThreads] = useState(() => {
+    try {
+      const stored = localStorage.getItem(threadsKey)
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+    } catch {}
+    return [_makeThread(convName, isGroup)]
+  })
+
+  const [activeIdx, setActiveIdx] = useState(0)
+  const [showThreads, setShowThreads] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [listening, setListening] = useState(false)
+  const [showEmoji, setShowEmoji] = useState(false)
   const bottomRef = useRef(null)
+  const fileInputRef = useRef()
+  const recRef = useRef(null)
+
+  const safeIdx = Math.min(activeIdx, threads.length - 1)
+  const activeThread = threads[safeIdx]
+  const msgs = activeThread?.messages || []
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs.length])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(threadsKey, JSON.stringify(threads.slice(-10)))
+    } catch {}
+  }, [threads, threadsKey])
+
+  const updateThread = (idx, fn) =>
+    setThreads(prev => { const next = [...prev]; next[idx] = fn(next[idx]); return next })
 
   const send = async (text) => {
     const t = (text || input).trim()
     if (!t || loading) return
     setInput('')
-    setMsgs((m) => [...m, { role: 'user', text: t }])
+    setShowEmoji(false)
+    const curIdx = safeIdx
+
+    updateThread(curIdx, th => ({
+      ...th,
+      name: th.name === 'New Thread' ? t.slice(0, 28) : th.name,
+      messages: [...th.messages, { role: 'user', text: t }],
+    }))
     setLoading(true)
     try {
-      const res = await client.post('/ai/chat', { message: t })
-      setMsgs((m) => [...m, {
-        role: 'bot',
-        text: res.data.text || 'No response.',
-        toolCalls: res.data.tool_calls || [],
-      }])
+      const res = await client.post('/ai/chat', {
+        message: t,
+        session_id: threads[curIdx]?.id,
+        conv_id: convId,
+        is_group: isGroup || false,
+        conv_name: convName,
+        other_user_id: otherUserId,
+      })
+      updateThread(curIdx, th => ({
+        ...th,
+        messages: [...th.messages, {
+          role: 'bot',
+          text: res.data.text || 'No response.',
+          toolCalls: res.data.tool_calls || [],
+        }],
+      }))
     } catch {
-      setMsgs((m) => [...m, { role: 'bot', text: 'Something went wrong. Please try again.' }])
+      updateThread(curIdx, th => ({
+        ...th,
+        messages: [...th.messages, { role: 'bot', text: '⚠️ Something went wrong. Please try again.' }],
+      }))
     } finally { setLoading(false) }
   }
 
+  const newThread = () => {
+    const t = _makeThread(convName, isGroup)
+    setThreads(prev => [...prev, t])
+    setActiveIdx(threads.length)
+    setShowThreads(false)
+  }
+
+  const deleteThread = (idx, e) => {
+    e.stopPropagation()
+    if (threads.length === 1) { setThreads([_makeThread(convName, isGroup)]); setActiveIdx(0); return }
+    client.delete(`/ai/chat/session/${threads[idx].id}`).catch(() => {})
+    setThreads(prev => prev.filter((_, i) => i !== idx))
+    setActiveIdx(prev => (prev >= idx ? Math.max(0, prev - 1) : prev))
+    setShowThreads(false)
+  }
+
+  const startVoice = () => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) { import('react-hot-toast').then(m => m.default.error('Voice not supported in this browser')); return }
+    const rec = new SR()
+    rec.lang = 'en-US'
+    rec.interimResults = false
+    rec.onresult = (e) => setInput(prev => prev + e.results[0][0].transcript + ' ')
+    rec.onend = () => setListening(false)
+    rec.onerror = () => setListening(false)
+    recRef.current = rec
+    rec.start()
+    setListening(true)
+  }
+  const stopVoice = () => { recRef.current?.stop(); setListening(false) }
+
+  const handleFile = (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    const isText = file.type.startsWith('text/') || /\.(txt|md|csv|json|xml|html|js|py|ts)$/i.test(file.name)
+    if (isText) {
+      const reader = new FileReader()
+      reader.onload = (ev) => {
+        const text = ev.target.result
+        send(`📎 [Document: ${file.name}]\n\n${text.slice(0, 1500)}${text.length > 1500 ? '\n...(truncated)' : ''}`)
+      }
+      reader.readAsText(file)
+    } else {
+      send(`📎 I've uploaded a file: **${file.name}** (${(file.size / 1024).toFixed(1)} KB). Can you help me with anything related to this?`)
+    }
+    e.target.value = ''
+  }
+
+  const STARTERS = isGroup
+    ? [`Summarize ${convName || 'this group'}`, 'What was decided recently? 🤔', 'Find messages about deadlines 📌']
+    : [`Summarize my chat with ${convName || 'this person'} 📋`, 'What did we discuss? 💬', 'Find messages from last week 🔍']
+
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      {/* AI header */}
-      <div
-        className="px-3 py-2.5 flex items-center gap-2 border-b border-slate-100 flex-shrink-0"
-        style={{ background: 'linear-gradient(to right, #f0f4ff, #f5f3ff)' }}
-      >
+    <div className="flex flex-col flex-1 overflow-hidden relative">
+      {/* Header */}
+      <div className="px-3 py-2 flex items-center gap-2 border-b border-slate-100 flex-shrink-0"
+           style={{ background: 'linear-gradient(to right, #f0f4ff, #f5f3ff)' }}>
         <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
              style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}>
           <Sparkles size={11} className="text-white" />
         </div>
-        <div>
-          <p className="text-xs font-bold text-indigo-700 leading-tight">AI Assistant</p>
-          <p className="text-xs text-slate-400 leading-tight">Powered by Gemini</p>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-bold text-indigo-700 leading-tight truncate">
+            {activeThread?.name || 'AI Assistant'}
+          </p>
+          <p className="text-xs text-slate-400 leading-tight">Powered by Gemini ✨</p>
+        </div>
+        <div className="flex gap-0.5 flex-shrink-0">
+          <button onClick={() => setShowThreads(v => !v)}
+            className={`p-1 rounded-lg transition-all ${showThreads ? 'text-indigo-500 bg-indigo-100' : 'text-slate-400 hover:text-indigo-500'}`}
+            title="Conversations">
+            <MessageSquare size={13} />
+          </button>
+          <button onClick={newThread}
+            className="p-1 text-slate-400 hover:text-indigo-500 rounded-lg transition-all"
+            title="New thread">
+            <Plus size={13} />
+          </button>
         </div>
       </div>
+
+      {/* Thread list overlay */}
+      {showThreads && (
+        <div className="absolute inset-x-0 z-20 bg-white border-b border-slate-100 shadow-lg"
+             style={{ top: 44 }}>
+          <div className="px-3 py-1.5 border-b border-slate-100 flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-700">Conversations</span>
+            <button onClick={() => setShowThreads(false)}
+              className="p-0.5 text-slate-400 hover:text-slate-600 rounded transition-all">
+              <X size={12} />
+            </button>
+          </div>
+          <div className="max-h-44 overflow-y-auto scrollbar-thin">
+            {threads.map((th, i) => (
+              <div key={th.id} onClick={() => { setActiveIdx(i); setShowThreads(false) }}
+                className={`flex items-center gap-2 px-3 py-2 cursor-pointer group transition-all ${
+                  i === safeIdx ? 'bg-indigo-50' : 'hover:bg-slate-50'
+                }`}>
+                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${i === safeIdx ? 'bg-indigo-500' : 'bg-slate-200'}`} />
+                <span className={`text-xs flex-1 truncate ${i === safeIdx ? 'text-indigo-700 font-semibold' : 'text-slate-600'}`}>
+                  {th.name}
+                </span>
+                <button onClick={(e) => deleteThread(i, e)}
+                  className="text-slate-300 hover:text-red-400 text-sm leading-none flex-shrink-0 opacity-0 group-hover:opacity-100 transition-all px-1">
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+          <div className="px-3 py-1.5 border-t border-slate-100">
+            <button onClick={newThread}
+              className="w-full flex items-center justify-center gap-1 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all">
+              <Plus size={11} /> New Thread
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-2.5 space-y-2 scrollbar-thin">
@@ -483,7 +655,7 @@ function InlineAIChat({ convName }) {
                 {msg.role === 'bot' && (
                   <span className="flex items-center gap-1 mb-1">
                     <Sparkles size={9} className="text-indigo-400" />
-                    <span className="text-xs text-indigo-500 font-semibold">AI</span>
+                    <span className="text-xs text-indigo-500 font-semibold">AI ✨</span>
                   </span>
                 )}
                 <p className="whitespace-pre-wrap break-words">{msg.text}</p>
@@ -491,55 +663,74 @@ function InlineAIChat({ convName }) {
             </div>
             {msg.toolCalls?.length > 0 && (
               <div className="mt-1 space-y-1">
-                {msg.toolCalls.map((tc, j) => (
-                  <MiniToolCard key={j} tc={tc} />
-                ))}
+                {msg.toolCalls.map((tc, j) => <MiniToolCard key={j} tc={tc} />)}
               </div>
             )}
           </div>
         ))}
         {loading && (
           <div className="flex items-center gap-1.5 text-indigo-400 text-xs px-1">
-            <Loader2 size={11} className="animate-spin" /> Thinking…
+            <Loader2 size={11} className="animate-spin" /> Thinking… ✨
           </div>
         )}
         <div ref={bottomRef} />
       </div>
 
-      {/* Quick examples — only shown when just the welcome message */}
+      {/* Quick starters (first message only) */}
       {msgs.length === 1 && (
         <div className="px-2.5 pb-1 space-y-1 flex-shrink-0">
-          {STARTER_EXAMPLES.map((ex) => (
-            <button
-              key={ex}
-              onClick={() => send(ex)}
-              className="w-full text-left text-xs text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg transition-all font-medium truncate"
-            >
+          {STARTERS.map((ex) => (
+            <button key={ex} onClick={() => send(ex)}
+              className="w-full text-left text-xs text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg transition-all font-medium truncate">
               "{ex}"
             </button>
           ))}
         </div>
       )}
 
-      {/* Input */}
-      <div className="p-2.5 border-t border-slate-100 flex-shrink-0">
-        <div className="flex gap-1.5 items-center">
+      {/* Input area */}
+      <div className="p-2 border-t border-slate-100 flex-shrink-0">
+        {showEmoji && (
+          <div className="mb-1.5 bg-white border border-slate-200 rounded-xl p-1.5 grid grid-cols-6 gap-0.5 shadow-md">
+            {EMOJIS.map(em => (
+              <button key={em} onClick={() => { setInput(p => p + em); setShowEmoji(false) }}
+                className="text-base hover:bg-slate-100 rounded-lg p-0.5 transition-all leading-none">
+                {em}
+              </button>
+            ))}
+          </div>
+        )}
+        <div className="flex gap-1 items-center">
+          <button onClick={() => setShowEmoji(v => !v)}
+            className={`p-1 rounded-lg transition-all flex-shrink-0 text-base leading-none ${showEmoji ? 'bg-indigo-50' : 'opacity-70 hover:opacity-100'}`}
+            title="Emoji">
+            😊
+          </button>
+          <button onClick={() => fileInputRef.current?.click()}
+            className="p-1 text-slate-400 hover:text-indigo-500 rounded-lg transition-all flex-shrink-0"
+            title="Upload document">
+            <Paperclip size={13} />
+          </button>
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && send()}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
             placeholder="Ask AI…"
-            className="flex-1 px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 transition-all"
+            className="flex-1 min-w-0 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 transition-all"
           />
-          <button
-            onClick={() => send()}
-            disabled={!input.trim() || loading}
-            className="p-2 text-white rounded-xl disabled:opacity-40 transition-all flex-shrink-0"
-            style={{ background: 'linear-gradient(135deg, #6366f1, #7c3aed)' }}
-          >
-            <Send size={13} />
+          <button onClick={listening ? stopVoice : startVoice}
+            className={`p-1 rounded-lg transition-all flex-shrink-0 ${listening ? 'text-red-500 bg-red-50 animate-pulse' : 'text-slate-400 hover:text-indigo-500'}`}
+            title={listening ? 'Stop' : 'Voice input'}>
+            <Mic size={13} />
+          </button>
+          <button onClick={() => send()} disabled={!input.trim() || loading}
+            className="p-1.5 text-white rounded-xl disabled:opacity-40 transition-all flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #6366f1, #7c3aed)' }}>
+            <Send size={12} />
           </button>
         </div>
+        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFile}
+          accept=".txt,.md,.csv,.json,.xml,.html,.js,.py,.ts,.pdf,.doc,.docx" />
       </div>
     </div>
   )
@@ -547,25 +738,26 @@ function InlineAIChat({ convName }) {
 
 function MiniToolCard({ tc }) {
   const [open, setOpen] = useState(false)
-  const count = Array.isArray(tc.result) ? tc.result.length : (tc.result?.summary ? 1 : 0)
+  const result = tc.result
+  const count = Array.isArray(result) ? result.length : (result?.summary ? 1 : 0)
   return (
     <div className="bg-white border border-indigo-100 rounded-lg overflow-hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs hover:bg-indigo-50/50 transition-all"
-      >
+      <button onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs hover:bg-indigo-50/50 transition-all">
         <span className="font-semibold text-indigo-600 truncate">🔧 {tc.tool}</span>
-        <span className="text-slate-400 flex-shrink-0 ml-1">{count} {open ? '▲' : '▼'}</span>
+        <span className="text-slate-400 flex-shrink-0 ml-1">{count > 0 ? count : ''} {open ? '▲' : '▼'}</span>
       </button>
-      {open && tc.result && (
+      {open && result && (
         <div className="px-2.5 pb-1.5 space-y-1">
-          {Array.isArray(tc.result)
-            ? tc.result.slice(0, 3).map((r, i) => (
+          {Array.isArray(result)
+            ? result.slice(0, 3).map((r, i) => (
                 <p key={i} className="text-xs text-slate-600 bg-indigo-50/50 rounded-md p-1.5 truncate">
                   {r.content || JSON.stringify(r).slice(0, 80)}
                 </p>
               ))
-            : <p className="text-xs text-slate-600">{tc.result?.summary || JSON.stringify(tc.result).slice(0, 100)}</p>
+            : <p className="text-xs text-slate-600 whitespace-pre-wrap break-words">
+                {result?.summary || result?.error || JSON.stringify(result).slice(0, 150)}
+              </p>
           }
         </div>
       )}
