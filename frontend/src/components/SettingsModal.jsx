@@ -29,6 +29,18 @@ export default function SettingsModal({ onClose, onSignOut }) {
   const [workLocation, setWorkLocation] = useState(user?.work_location || '')
   const [saving, setSaving] = useState(false)
 
+  // Fetch saved profile fields from API when Profile tab opens
+  useEffect(() => {
+    if (tab !== 'Profile') return
+    client.get(`/users/${user?.user_id}`).then(r => {
+      const u = r.data
+      setJobTitle(u.job_title || 'Software Engineer')
+      setDepartment(u.department || 'Delivery')
+      setWorkLocation(u.work_location || 'Chennai - Guindy')
+      setCompany(u.company || '')
+    }).catch(() => {})
+  }, [tab])
+
   // Demo dataset state
   const [seedStatus, setSeedStatus] = useState(null)
   const [confirmRemove, setConfirmRemove] = useState(false)

@@ -55,20 +55,18 @@ export default function UserInfoModal({ userId, onClose, onMessage }) {
           </div>
         ) : user ? (
           <div className="px-5 pb-5">
-            {/* Avatar row overlapping banner */}
-            <div className="flex items-end gap-4 -mt-8 mb-4">
+            {/* Avatar overlapping banner, name/status below in white area */}
+            <div className="-mt-8 mb-4">
               <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-xl border-4 border-white flex-shrink-0"
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-xl border-4 border-white mb-2"
                 style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}
               >
                 {user.display_name?.slice(0, 2).toUpperCase() || '??'}
               </div>
-              <div className="pb-1 min-w-0">
-                <h3 className="font-bold text-slate-900 text-base truncate leading-tight">{user.display_name}</h3>
-                <p className={`text-xs font-semibold mt-0.5 ${isOnline ? 'text-emerald-500' : 'text-slate-400'}`}>
-                  ● {presenceText}
-                </p>
-              </div>
+              <h3 className="font-bold text-slate-900 text-base leading-tight">{user.display_name}</h3>
+              <p className={`text-xs font-semibold mt-0.5 ${isOnline ? 'text-emerald-500' : 'text-slate-400'}`}>
+                ● {presenceText}
+              </p>
             </div>
 
             {/* Divider */}
