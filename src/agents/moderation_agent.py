@@ -1,5 +1,6 @@
 import re
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Tuple
+
 from src.agents.base_agent import BaseAgent
 from src.common.logger import get_logger
 
@@ -21,7 +22,11 @@ Evaluate messages for:
 2. Spam patterns
 3. Personal information leakage
 4. Policy violations
-Return a moderation decision with confidence score.""",
+
+Respond in this EXACT format:
+SEVERITY: [0-10]
+RECOMMENDATION: [allow|warn|block]
+REASON: [one sentence]""",
         )
 
     async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -32,24 +37,40 @@ Return a moderation decision with confidence score.""",
 
         flags = self._rule_based_check(content)
 
-        if flags:
-            ai_prompt = f"""Evaluate this message for policy violations:
-"{content}"
+        if not flags:
+            return {
+                "agent": self.name,
+                "message_id": message_id,
+                "is_flagged": False,
+                "flags": [],
+                "severity": 0,
+                "assessment": "No violations detected.",
+                "action": "allow",
+            }
 
-Flags detected: {', '.join(flags)}
-Is this genuinely harmful? Rate severity 0-10. Recommend: allow/warn/block."""
-            ai_assessment = await self._generate(ai_prompt, max_tokens=256)
-        else:
-            ai_assessment = "No violations detected."
+        # Rule matched — ask the AI to score actual severity before deciding
+        ai_prompt = (
+            f'Evaluate this message for policy violations:\n"{content}"\n\n'
+            f'Flags detected: {", ".join(flags)}\n'
+            "Is this genuinely harmful? Use the exact response format specified."
+        )
+        ai_assessment = await self._generate(ai_prompt, max_tokens=128)
+        severity, recommendation, reason = _parse_assessment(ai_assessment)
 
-        is_flagged = len(flags) > 0
+        logger.info(
+            "moderation_ai_result",
+            severity=severity,
+            recommendation=recommendation,
+        )
+
         return {
             "agent": self.name,
             "message_id": message_id,
-            "is_flagged": is_flagged,
+            "is_flagged": True,
             "flags": flags,
-            "assessment": ai_assessment,
-            "action": "block" if is_flagged else "allow",
+            "severity": severity,
+            "assessment": reason,
+            "action": recommendation,   # allow | warn | block — AI-driven, not just rule-matched
         }
 
     def _rule_based_check(self, content: str) -> List[str]:
@@ -59,3 +80,30 @@ Is this genuinely harmful? Rate severity 0-10. Recommend: allow/warn/block."""
             if re.search(pattern, content_lower):
                 flags.append(f"pattern_match:{pattern[:20]}")
         return flags
+
+
+def _parse_assessment(response: str) -> Tuple[int, str, str]:
+    """Extract severity (0-10), recommendation (allow/warn/block), and reason."""
+    severity = 5
+    recommendation = "warn"
+    reason = response.strip()
+
+    for line in response.splitlines():
+        line = line.strip()
+        if line.upper().startswith("SEVERITY:"):
+            try:
+                severity = int(re.search(r"\d+", line).group())
+            except (AttributeError, ValueError):
+                pass
+        elif line.upper().startswith("RECOMMENDATION:"):
+            val = line.split(":", 1)[1].strip().lower()
+            if val in ("allow", "warn", "block"):
+                recommendation = val
+        elif line.upper().startswith("REASON:"):
+            reason = line.split(":", 1)[1].strip()
+
+    # Safety override: severity 8+ always blocks regardless of recommendation
+    if severity >= 8:
+        recommendation = "block"
+
+    return severity, recommendation, reason

@@ -4,13 +4,13 @@ LangGraph-based multi-agent orchestration.
 Flow:
   START
     └─► moderate  ──(blocked)──► finalise ──► END
-              └──(allowed)──► router
-                                 ├─► search    ──► judge ──(pass)──► finalise ──► END
-                                 │                     └──(fail,retry<2)──► search
-                                 ├─► summarise ──► judge ──(pass)──► finalise ──► END
-                                 │                     └──(fail,retry<2)──► summarise
-                                 ├─► delivery ──────────────────────► finalise ──► END
-                                 └─► notify   ──────────────────────► finalise ──► END
+              └──(warn/allow)──► router
+                                   ├─► search    ──► judge ──(pass)──► finalise ──► END
+                                   │                     └──(fail,retry<2)──► search (rephrased query)
+                                   ├─► summarise ──► judge ──(pass)──► finalise ──► END
+                                   │                     └──(fail,retry<2)──► summarise
+                                   ├─► delivery ──────────────────────► finalise ──► END
+                                   └─► notify   ──────────────────────► finalise ──► END
 """
 
 from __future__ import annotations
@@ -33,6 +33,8 @@ class AgentState(TypedDict):
     context: Dict[str, Any]
     # routing
     intent: str
+    # on retry the judge rewrites the query; search uses this if set
+    retry_query: Optional[str]
     # per-agent outputs (None until that node runs)
     moderation_result: Optional[Dict[str, Any]]
     search_result: Optional[Dict[str, Any]]
@@ -46,25 +48,48 @@ class AgentState(TypedDict):
     error: Optional[str]
 
 
+# ── Keyword-based intent fallback (used when Gemini is unavailable) ───────────
+
+def _keyword_intent(query: str) -> str:
+    q = query.lower()
+    if any(w in q for w in ["summar", "recap", "overview", "tldr", "what was discussed"]):
+        return "summarise"
+    if any(w in q for w in ["deliver", "failed", "recover", "undelivered", "retry"]):
+        return "delivery"
+    if any(w in q for w in ["notif", "alert", "ping", "remind", "notify"]):
+        return "notify"
+    return "search"
+
+
 # ── Node functions (each returns only the keys it mutates) ────────────────────
 
 async def _moderate_node(state: AgentState) -> dict:
-    """Safety gate — always the first node. Blocks harmful content immediately."""
+    """
+    Safety gate — always first.
+    Now uses AI severity score (not just rule match) to decide allow/warn/block.
+    """
     from src.agents.moderation_agent import ModerationAgent
     result = await ModerationAgent().run({"content": state["query"], "message_id": ""})
-    logger.info("graph_moderate", is_flagged=result["is_flagged"], action=result["action"])
+    logger.info("graph_moderate", action=result["action"], severity=result.get("severity", 0))
     return {"moderation_result": result}
 
 
 async def _router_node(state: AgentState) -> dict:
-    """Classifies the query into one of four intents via a single Gemini call."""
-    from src.ai.gemini_client import generate_text
-    prompt = (
-        "Classify this query into exactly one word — search, summarise, delivery, or notify.\n"
-        f'Query: "{state["query"]}"\n'
-        "Reply with just the single word, nothing else."
-    )
-    raw = (await generate_text(prompt, max_tokens=10)).strip().lower()
+    """
+    Classifies intent via Gemini.
+    Falls back to keyword matching if Gemini call fails (circuit open, timeout, etc.).
+    """
+    try:
+        from src.ai.gemini_client import generate_text
+        prompt = (
+            "Classify this query into exactly one word — search, summarise, delivery, or notify.\n"
+            f'Query: "{state["query"]}"\n'
+            "Reply with just the single word, nothing else."
+        )
+        raw = (await generate_text(prompt, max_tokens=10)).strip().lower()
+    except Exception as exc:
+        logger.warning("graph_router_gemini_failed", error=str(exc), fallback="keyword")
+        raw = _keyword_intent(state["query"])
 
     if "summar" in raw:
         intent = "summarise"
@@ -80,10 +105,17 @@ async def _router_node(state: AgentState) -> dict:
 
 
 async def _search_node(state: AgentState) -> dict:
-    """Runs hybrid semantic + BM25 search and analyses top results."""
+    """
+    Hybrid semantic + BM25 search.
+    On retry, uses the rephrased query produced by the judge node.
+    """
+    query = state.get("retry_query") or state["query"]
+    if state.get("retry_query"):
+        logger.info("graph_search_retry", rephrased_query=query[:60])
+
     from src.agents.search_agent import SearchAgent
     result = await SearchAgent().run({
-        "query": state["query"],
+        "query": query,
         "filters": state["context"].get("filters", {}),
         "n_results": state["context"].get("n_results", 10),
     })
@@ -92,7 +124,7 @@ async def _search_node(state: AgentState) -> dict:
 
 
 async def _summarise_node(state: AgentState) -> dict:
-    """RAG-based conversation summarisation; internal quality score already set."""
+    """RAG-based summarisation; SummarisationAgent already runs JudgeAgent internally."""
     from src.agents.summarisation_agent import SummarisationAgent
     result = await SummarisationAgent().run({
         "group_id": state["context"].get("group_id"),
@@ -104,15 +136,15 @@ async def _summarise_node(state: AgentState) -> dict:
 
 
 async def _delivery_node(state: AgentState) -> dict:
-    """Finds failed messages and re-delivers them if the receiver is now online."""
+    """Priority-queued delivery recovery with backoff and escalation."""
     from src.agents.delivery_agent import DeliveryAgent
     result = await DeliveryAgent().run(state["context"])
-    logger.info("graph_delivery", recovered=result.get("recovered", 0))
+    logger.info("graph_delivery", recovered=result.get("recovered", 0), escalated=result.get("escalated", 0))
     return {"delivery_result": result}
 
 
 async def _notification_node(state: AgentState) -> dict:
-    """Determines notification urgency and optimal delivery timing."""
+    """Urgency assessment and optimal notification timing."""
     from src.agents.notification_agent import NotificationAgent
     result = await NotificationAgent().run({
         "user_id": state["user_id"],
@@ -127,14 +159,13 @@ async def _judge_node(state: AgentState) -> dict:
     """
     Quality gate for search and summarise outputs.
 
-    - For summarise: reuses the quality_score already produced by SummarisationAgent
-      to avoid a redundant Gemini call.
-    - For search: calls JudgeAgent to score the top result.
-    - Increments retry_count so the conditional edge can cap retries at 1.
+    - Summarise: reuses the internal quality_score (no extra Gemini call).
+    - Search: calls JudgeAgent on the top result.
+    - On low score (first attempt only): generates a rephrased query for search retry.
     """
     retry_count = state.get("retry_count", 0)
 
-    # Summarise already ran JudgeAgent internally — reuse that score.
+    # ── Summarise path: reuse pre-computed score ──────────────────────────────
     summ = state.get("summarisation_result") or {}
     if summ and "quality_score" in summ:
         judgment = {
@@ -144,7 +175,7 @@ async def _judge_node(state: AgentState) -> dict:
         logger.info("graph_judge_reuse", score=summ["quality_score"])
         return {"judge_result": judgment, "retry_count": retry_count + 1}
 
-    # Fresh evaluation for search results.
+    # ── Search path: evaluate top result ─────────────────────────────────────
     results = (state.get("search_result") or {}).get("results", [])
     content = results[0]["content"] if results else ""
 
@@ -153,12 +184,35 @@ async def _judge_node(state: AgentState) -> dict:
         return {
             "judge_result": {"average_score": 8, "feedback": "no content to evaluate"},
             "retry_count": retry_count + 1,
+            "retry_query": None,
         }
 
     from src.agents.judge_agent import JudgeAgent
     judgment = await JudgeAgent().evaluate(content, state.get("context", {}))
-    logger.info("graph_judge", score=judgment.get("average_score"))
-    return {"judge_result": judgment, "retry_count": retry_count + 1}
+    score = judgment.get("average_score", 10)
+    logger.info("graph_judge", score=score)
+
+    # Generate a rephrased query on first low-score run so the retry isn't identical
+    retry_query: Optional[str] = None
+    if score < 7 and retry_count < 1:
+        try:
+            from src.ai.gemini_client import generate_text
+            expand_prompt = (
+                f'The search query "{state["query"]}" returned poor results '
+                f'(quality score {score:.1f}/10). '
+                "Rewrite it to be more specific and likely to find relevant messages. "
+                "Reply with just the improved query, nothing else."
+            )
+            retry_query = (await generate_text(expand_prompt, max_tokens=60)).strip()
+            logger.info("graph_judge_rephrase", retry_query=retry_query[:60])
+        except Exception as exc:
+            logger.warning("graph_judge_rephrase_failed", error=str(exc))
+
+    return {
+        "judge_result": judgment,
+        "retry_count": retry_count + 1,
+        "retry_query": retry_query,
+    }
 
 
 async def _finalise_node(state: AgentState) -> dict:
@@ -169,40 +223,47 @@ async def _finalise_node(state: AgentState) -> dict:
         response: Dict[str, Any] = {
             "status": "blocked",
             "reason": "Content violates platform policy",
+            "severity": mod.get("severity", 0),
             "flags": mod.get("flags", []),
             "assessment": mod.get("assessment", ""),
         }
-    elif state.get("search_result"):
-        response = {
-            "status": "ok",
-            "intent": "search",
-            "data": state["search_result"],
-            "quality": state.get("judge_result"),
-        }
-    elif state.get("summarisation_result"):
-        response = {
-            "status": "ok",
-            "intent": "summarise",
-            "data": state["summarisation_result"],
-            "quality": state.get("judge_result"),
-        }
-    elif state.get("delivery_result"):
-        response = {
-            "status": "ok",
-            "intent": "delivery",
-            "data": state["delivery_result"],
-        }
-    elif state.get("notification_result"):
-        response = {
-            "status": "ok",
-            "intent": "notify",
-            "data": state["notification_result"],
-        }
     else:
-        response = {
-            "status": "error",
-            "error": state.get("error") or "No agent produced a result",
-        }
+        # Build core response from whichever specialist ran
+        if state.get("search_result"):
+            response = {
+                "status": "ok",
+                "intent": "search",
+                "data": state["search_result"],
+                "quality": state.get("judge_result"),
+            }
+        elif state.get("summarisation_result"):
+            response = {
+                "status": "ok",
+                "intent": "summarise",
+                "data": state["summarisation_result"],
+                "quality": state.get("judge_result"),
+            }
+        elif state.get("delivery_result"):
+            response = {
+                "status": "ok",
+                "intent": "delivery",
+                "data": state["delivery_result"],
+            }
+        elif state.get("notification_result"):
+            response = {
+                "status": "ok",
+                "intent": "notify",
+                "data": state["notification_result"],
+            }
+        else:
+            response = {
+                "status": "error",
+                "error": state.get("error") or "No agent produced a result",
+            }
+
+        # Attach moderation warning if content was flagged but not blocked
+        if mod.get("action") == "warn":
+            response["moderation_warning"] = mod.get("assessment", "Content flagged for review")
 
     return {"final_response": response}
 
@@ -210,9 +271,8 @@ async def _finalise_node(state: AgentState) -> dict:
 # ── Conditional edge functions ─────────────────────────────────────────────────
 
 def _after_moderation(state: AgentState) -> Literal["blocked", "route"]:
-    if (state.get("moderation_result") or {}).get("action") == "block":
-        return "blocked"
-    return "route"
+    action = (state.get("moderation_result") or {}).get("action", "allow")
+    return "blocked" if action == "block" else "route"
 
 
 def _by_intent(
@@ -225,7 +285,7 @@ def _after_judge(
     state: AgentState,
 ) -> Literal["retry_search", "retry_summarise", "finalise"]:
     score = (state.get("judge_result") or {}).get("average_score", 10)
-    # retry_count was already incremented by _judge_node; cap at 1 retry
+    # retry_count already incremented by _judge_node; cap retries at 1
     retry_count = state.get("retry_count", 0)
     if score < 7 and retry_count < 2:
         intent = state.get("intent", "search")
@@ -247,10 +307,9 @@ def _build_graph() -> StateGraph:
     g.add_node("judge",     _judge_node)
     g.add_node("finalise",  _finalise_node)
 
-    # Entry point — moderation always runs first
     g.set_entry_point("moderate")
 
-    # Moderation gate
+    # Moderation gate: block → finalise, warn/allow → router
     g.add_conditional_edges(
         "moderate",
         _after_moderation,
@@ -269,15 +328,15 @@ def _build_graph() -> StateGraph:
         },
     )
 
-    # Quality gate: search + summarise go through judge
+    # Quality gate for search + summarise
     g.add_edge("search",    "judge")
     g.add_edge("summarise", "judge")
 
-    # Delivery + notify skip quality gate — go straight to finalise
+    # Delivery + notify bypass quality gate
     g.add_edge("delivery", "finalise")
     g.add_edge("notify",   "finalise")
 
-    # Judge: pass → finalise, fail → retry (once) → back to specialist
+    # Judge: retry once with rephrased query, or finalise
     g.add_conditional_edges(
         "judge",
         _after_judge,
@@ -304,16 +363,17 @@ async def run_agent_graph(query: str, context: Dict[str, Any]) -> Dict[str, Any]
 
     Args:
         query:   The user's input text.
-        context: Arbitrary key/value context (user_id, group_id, filters, etc.)
+        context: Key/value context (user_id, group_id, filters, days, etc.)
 
     Returns:
-        A dict with keys: status, intent, data, quality (where applicable).
+        Dict with keys: status, intent, data, quality, moderation_warning (where applicable).
     """
     initial_state: AgentState = {
         "query": query,
         "user_id": context.get("user_id", ""),
         "context": context,
         "intent": "",
+        "retry_query": None,
         "moderation_result": None,
         "search_result": None,
         "summarisation_result": None,
