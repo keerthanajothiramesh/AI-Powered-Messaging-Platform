@@ -33,33 +33,41 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Left sidebar */}
-      <aside className="w-72 flex flex-col bg-white border-r border-gray-100 shadow-sm">
-        <div className="px-4 py-4 border-b border-gray-100 flex items-center gap-3">
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+    <div className="flex h-screen overflow-hidden" style={{ background: '#eef2ff' }}>
+      {/* Left sidebar — dark indigo/violet gradient */}
+      <aside className="w-72 flex flex-col flex-shrink-0"
+             style={{ background: 'linear-gradient(180deg, #1e1b4b 0%, #2d1b69 50%, #2e1065 100%)' }}>
+        <div className="px-4 py-4 border-b border-white/10 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
+               style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}>
             <MessageSquare size={18} className="text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-gray-900 truncate">{t('app.name')}</p>
+            <p className="text-sm font-bold text-white truncate">{t('app.name')}</p>
           </div>
         </div>
+
         <div className="flex-1 overflow-hidden">
           <ConversationList onCreateGroup={() => setShowGroupModal(true)} />
         </div>
-        <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2">
+
+        <div className="px-4 py-3 border-t border-white/10 flex items-center gap-2.5">
           <button
             onClick={() => setShowSettings(true)}
-            className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-semibold hover:opacity-80 transition-opacity"
+            className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold hover:opacity-90 transition-opacity shadow-md flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}
             title="Settings & profile"
           >
             {user?.display_name?.slice(0, 2).toUpperCase() || 'U'}
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-gray-900 truncate">{user?.display_name}</p>
-            <p className="text-xs text-green-500">● online</p>
+            <p className="text-xs font-semibold text-white truncate">{user?.display_name}</p>
+            <p className="text-xs text-emerald-400 font-medium">● online</p>
           </div>
-          <button onClick={handleLogout} className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors">
+          <button
+            onClick={handleLogout}
+            className="p-1.5 text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition-all"
+          >
             <LogOut size={16} />
           </button>
         </div>
@@ -70,7 +78,7 @@ export default function DashboardPage() {
         {showAI ? <AIAssistantPanel onClose={() => setShowAI(false)} /> : <ChatWindow />}
       </main>
 
-      {/* Right panel — always visible, hosts the toolbar */}
+      {/* Right panel */}
       <RightPanel
         onSearchOpen={() => setShowSearch(true)}
         showAI={showAI}

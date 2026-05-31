@@ -46,30 +46,38 @@ export default function ConversationList({ onCreateGroup }) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-gray-100">
+      <div className="p-3 border-b border-white/10">
         <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
           <input
             value={search}
             onChange={(e) => handleSearch(e.target.value)}
             placeholder={t('search.placeholder')}
-            className="w-full pl-9 pr-3 py-2 bg-gray-50 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            className="w-full pl-9 pr-3 py-2 bg-white/10 border border-white/15 rounded-xl text-sm text-white placeholder:text-white/35 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:bg-white/15 transition-all"
           />
         </div>
       </div>
 
-      <div className="flex border-b border-gray-100 text-xs font-medium">
+      <div className="flex border-b border-white/10 text-xs font-medium">
         <button
           onClick={() => setActiveTab('groups')}
-          className={`flex-1 py-2 flex items-center justify-center gap-1 ${activeTab === 'groups' ? 'text-primary border-b-2 border-primary' : 'text-gray-500'}`}
+          className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === 'groups'
+              ? 'text-white border-b-2 border-violet-400'
+              : 'text-white/45 hover:text-white/70'
+          }`}
         >
-          <Users size={14} /> Groups
+          <Users size={13} /> Groups
         </button>
         <button
           onClick={() => setActiveTab('dms')}
-          className={`flex-1 py-2 flex items-center justify-center gap-1 ${activeTab === 'dms' ? 'text-primary border-b-2 border-primary' : 'text-gray-500'}`}
+          className={`flex-1 py-2.5 flex items-center justify-center gap-1.5 transition-all ${
+            activeTab === 'dms'
+              ? 'text-white border-b-2 border-violet-400'
+              : 'text-white/45 hover:text-white/70'
+          }`}
         >
-          <MessageSquare size={14} /> Direct
+          <MessageSquare size={13} /> Direct
         </button>
       </div>
 
@@ -79,9 +87,9 @@ export default function ConversationList({ onCreateGroup }) {
             <div className="p-2">
               <button
                 onClick={onCreateGroup}
-                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-primary hover:bg-red-50 rounded-lg transition-colors"
+                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-indigo-300 hover:bg-white/10 rounded-xl transition-all font-medium"
               >
-                <Plus size={16} /> {t('groups.create')}
+                <Plus size={15} /> {t('groups.create')}
               </button>
             </div>
             {filteredGroups.map((g) => (
@@ -142,7 +150,7 @@ export default function ConversationList({ onCreateGroup }) {
                     )
                   })
                 : (
-                    <p className="text-center text-xs text-gray-400 p-4">
+                    <p className="text-center text-xs text-white/30 p-4 mt-2">
                       Search for a user to start a conversation
                     </p>
                   )
@@ -159,22 +167,36 @@ function ConvItem({ id, name, subtitle, isGroup, isActive, isOnline, unreadCount
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors text-left ${isActive ? 'bg-red-50 border-r-2 border-primary' : ''}`}
+      className={`w-full flex items-center gap-3 px-3 py-3 hover:bg-white/10 transition-all text-left ${
+        isActive ? 'bg-white/15 border-r-2 border-violet-400' : ''
+      }`}
     >
       <div className="relative flex-shrink-0">
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold text-white ${isGroup ? 'bg-primary' : 'bg-gray-400'}`}>
+        <div
+          className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-white"
+          style={{
+            background: isGroup
+              ? 'linear-gradient(135deg, #818cf8, #7c3aed)'
+              : 'linear-gradient(135deg, #64748b, #475569)',
+          }}
+        >
           {initials}
         </div>
         {!isGroup && (
-          <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white transition-colors ${isOnline ? 'bg-green-500' : 'bg-gray-300'}`} />
+          <span className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 transition-colors ${
+            isOnline ? 'bg-emerald-400 border-indigo-950' : 'bg-slate-500 border-indigo-950'
+          }`} />
         )}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-gray-900 truncate">{name}</p>
-        <p className={`text-xs truncate ${isOnline ? 'text-green-500 font-medium' : 'text-gray-400'}`}>{subtitle}</p>
+        <p className="text-sm font-semibold text-white truncate">{name}</p>
+        <p className={`text-xs truncate mt-0.5 ${isOnline ? 'text-emerald-400 font-medium' : 'text-white/38'}`}>
+          {subtitle}
+        </p>
       </div>
       {unreadCount > 0 && (
-        <span className="flex-shrink-0 min-w-[20px] h-5 bg-primary rounded-full text-xs text-white flex items-center justify-center font-semibold px-1">
+        <span className="flex-shrink-0 min-w-[20px] h-5 rounded-full text-xs text-white flex items-center justify-center font-bold px-1"
+              style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}>
           {unreadCount > 99 ? '99+' : unreadCount}
         </span>
       )}

@@ -3,9 +3,11 @@ export default {
   theme: {
     extend: {
       colors: {
-        primary: '#CC0000',
-        'primary-dark': '#990000',
-        'primary-light': '#FF3333',
+        primary: '#6366f1',
+        'primary-dark': '#4f46e5',
+        'primary-light': '#818cf8',
+        accent: '#7c3aed',
+        'accent-light': '#8b5cf6',
       },
     },
   },
