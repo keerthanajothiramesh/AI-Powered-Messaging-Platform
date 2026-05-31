@@ -22,6 +22,8 @@ export default function DashboardPage() {
   const [showSearch, setShowSearch] = useState(false)
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  // Controls which tab is shown in the RightPanel (set from ChatWindow header chips)
+  const [rightTab, setRightTab] = useState(null)
 
   useWebSocket()
 
@@ -74,7 +76,10 @@ export default function DashboardPage() {
 
       {/* Main content */}
       <main className="flex-1 flex overflow-hidden">
-        {showAI ? <AIAssistantPanel onClose={() => setShowAI(false)} /> : <ChatWindow />}
+        {showAI
+          ? <AIAssistantPanel onClose={() => setShowAI(false)} />
+          : <ChatWindow onRightTabChange={setRightTab} activeRightTab={rightTab} />
+        }
       </main>
 
       {/* Right panel */}
@@ -83,6 +88,8 @@ export default function DashboardPage() {
         showAI={showAI}
         onAIToggle={() => setShowAI((p) => !p)}
         onSettingsOpen={() => setShowSettings(true)}
+        activeTab={rightTab}
+        onTabChange={setRightTab}
       />
 
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}

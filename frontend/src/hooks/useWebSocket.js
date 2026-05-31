@@ -49,74 +49,124 @@ export function useWebSocket() {
 
   const handleEvent = useCallback((payload) => {
     const { type, data } = payload
+    const store = useChatStore.getState()
+    const currentUserId = useAuthStore.getState().user?.user_id
+
     if (type === 'connected') {
       if (data.queued_count > 0) {
         toast(`📬 ${data.queued_count} message${data.queued_count > 1 ? 's' : ''} delivered from while you were offline`)
       }
+
     } else if (type === 'typing') {
       const convId = data.group_id || data.user_id
       if (!convId) return
-      useChatStore.getState().setTyping(convId)
+      store.setTyping(convId)
       clearTimeout(typingTimeouts[convId])
       typingTimeouts[convId] = setTimeout(() => {
         useChatStore.getState().clearTyping(convId)
       }, 3000)
+
     } else if (type === 'message') {
-      const currentUserId = useAuthStore.getState().user?.user_id
       const convId = data.group_id
         || (data.sender_id === currentUserId ? data.receiver_id : data.sender_id)
       addMessage(convId, data)
-      if (convId !== useChatStore.getState().activeConversation?.id) {
-        toast(`New message from ${data.sender_id?.slice(0, 8)}…`, { icon: '💬' })
-        useChatStore.getState().incrementUnread(convId)
+      const isActive = convId === store.activeConversation?.id
+      if (!isActive) {
+        const senderLabel = data.sender_name || data.sender_id?.slice(0, 8)
+        toast(`💬 New message from ${senderLabel}`)
+        store.incrementUnread(convId)
+        // Push to notification store for the bell icon
+        store.addNotification({
+          notification_id: data.message_id,
+          type: 'new_message',
+          title: `Message from ${senderLabel}`,
+          body: data.media_type === 'text'
+            ? (data.content || '').slice(0, 80)
+            : `Sent a ${data.media_type}`,
+          is_read: false,
+          created_at: data.timestamp || new Date().toISOString(),
+        })
       }
       if (!data.group_id) {
-        useChatStore.getState().bumpDmRefresh()
+        store.bumpDmRefresh()
       }
+
     } else if (type === 'message_reaction') {
-      const currentUserId = useAuthStore.getState().user?.user_id
-      const convId = data.group_id
-        || (data.sender_id === currentUserId ? data.receiver_id : data.sender_id)
+      // Find the conversation via group_id first, then fall back to DM lookup across all messages
+      let convId = data.group_id
+      if (!convId) {
+        // Search all loaded conversations for the message
+        const allMessages = store.messages
+        for (const [cid, msgs] of Object.entries(allMessages)) {
+          if (msgs.some((m) => m.message_id === data.message_id)) {
+            convId = cid
+            break
+          }
+        }
+      }
       if (convId) {
-        const { messages, setReaction } = useChatStore.getState()
-        const msg = (messages[convId] || []).find((m) => m.message_id === data.message_id)
+        const msg = (store.messages[convId] || []).find((m) => m.message_id === data.message_id)
         if (msg) {
           const updated = { ...(msg.reactions || {}) }
           if (!updated[data.emoji]) updated[data.emoji] = []
           if (!updated[data.emoji].includes(data.user_id)) {
             updated[data.emoji] = [...updated[data.emoji], data.user_id]
           }
-          setReaction(convId, data.message_id, updated)
+          store.setReaction(convId, data.message_id, updated)
         }
       }
+
     } else if (type === 'group_added') {
-      const { groups } = useChatStore.getState()
+      const { groups } = store
       if (!groups.find((g) => g.group_id === data.group_id)) {
-        useChatStore.getState().setGroups([
+        store.setGroups([
           ...groups,
           { group_id: data.group_id, group_name: data.group_name, description: data.description, member_count: data.member_count },
         ])
-        toast(`You were added to "${data.group_name}"`, { icon: '👥' })
+        toast(`👥 You were added to "${data.group_name}"`)
+        store.addNotification({
+          notification_id: `group_added_${data.group_id}`,
+          type: 'group_added',
+          title: 'Added to group',
+          body: `You were added to "${data.group_name}"`,
+          is_read: false,
+          created_at: new Date().toISOString(),
+        })
       }
+
+    } else if (type === 'group_updated') {
+      store.updateGroup(data.group_id, {
+        group_name: data.group_name,
+        description: data.description,
+      })
+
+    } else if (type === 'group_removed') {
+      store.removeGroup(data.group_id)
+      toast(`Group was deleted`)
+
     } else if (type === 'message_edited') {
-      const currentUserId = useAuthStore.getState().user?.user_id
       const convId = data.group_id
         || (data.sender_id === currentUserId ? data.receiver_id : data.sender_id)
-      if (convId) useChatStore.getState().updateMessage(convId, data.message_id, data.content)
+      if (convId) store.updateMessage(convId, data.message_id, data.content)
+
     } else if (type === 'message_deleted') {
-      const currentUserId = useAuthStore.getState().user?.user_id
       const convId = data.group_id
         || (data.sender_id === currentUserId ? data.receiver_id : data.sender_id)
-      if (convId) useChatStore.getState().removeMessage(convId, data.message_id)
+      if (convId) store.removeMessage(convId, data.message_id)
+
     } else if (type === 'message_read') {
-      const active = useChatStore.getState().activeConversation
+      const active = store.activeConversation
       if (active) updateMessageStatus(active.id, data.message_id, 'read')
+
     } else if (type === 'user_online') {
-      useChatStore.getState().setUserOnline(data.user_id)
+      store.setUserOnline(data.user_id)
+
     } else if (type === 'user_offline') {
-      useChatStore.getState().setUserOffline(data.user_id, data.last_seen)
+      store.setUserOffline(data.user_id, data.last_seen)
+
     } else if (type === 'notification') {
       toast(data.body, { icon: '🔔' })
+      store.addNotification(data)
     }
   }, [addMessage, updateMessageStatus])
 

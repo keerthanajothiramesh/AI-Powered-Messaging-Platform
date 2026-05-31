@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Paperclip, Image, Mic, CheckCheck, Check, Pencil, Trash2, Square, FileText, MessageCircle } from 'lucide-react'
-import { format, isToday, isYesterday } from 'date-fns'
+import { Send, Paperclip, Image, Mic, CheckCheck, Check, Pencil, Trash2, Square, FileText, MessageCircle, Info, Image as ImageIcon } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
 import { useWebSocket } from '../hooks/useWebSocket'
+import { formatIST, formatISTFull, isISTToday, isISTYesterday } from '../utils/time'
 import client from '../api/client'
 import toast from 'react-hot-toast'
 
@@ -19,13 +19,12 @@ function resolveMediaUrl(url) {
 function formatPresence(isOnline, lastSeenTs) {
   if (isOnline) return { text: 'Online', green: true }
   if (!lastSeenTs) return { text: 'Offline', green: false }
-  const d = new Date(lastSeenTs)
-  if (isToday(d)) return { text: `Last seen at ${format(d, 'HH:mm')}`, green: false }
-  if (isYesterday(d)) return { text: 'Last seen yesterday', green: false }
-  return { text: `Last seen ${format(d, 'dd MMM')}`, green: false }
+  if (isISTToday(lastSeenTs)) return { text: `Last seen at ${formatIST(lastSeenTs)}`, green: false }
+  if (isISTYesterday(lastSeenTs)) return { text: 'Last seen yesterday', green: false }
+  return { text: `Last seen ${formatIST(lastSeenTs, 'dd MMM')}`, green: false }
 }
 
-export default function ChatWindow() {
+export default function ChatWindow({ onRightTabChange, activeRightTab }) {
   const { t } = useTranslation()
   const { activeConversation, messages, setMessages, onlineUsers, lastSeen, typingUsers, setReaction } = useChatStore()
   const { user } = useAuthStore()
@@ -202,10 +201,15 @@ export default function ChatWindow() {
     )
   }
 
+  // Determine header tab labels based on conversation type
+  const tabs = activeConversation.isGroup
+    ? [{ key: 'members', label: 'Members' }, { key: 'summary', label: 'Summary' }]
+    : [{ key: 'info', label: 'Info' }, { key: 'shared', label: 'Shared' }]
+
   return (
     <div className="flex-1 flex flex-col bg-white overflow-hidden">
       {/* Header */}
-      <div className="px-6 py-3.5 border-b border-slate-100 flex items-center gap-3 bg-white shadow-sm flex-shrink-0">
+      <div className="px-4 py-3 border-b border-slate-100 flex items-center gap-3 bg-white shadow-sm flex-shrink-0">
         <div className="relative flex-shrink-0">
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md"
@@ -219,8 +223,28 @@ export default function ChatWindow() {
             }`} />
           )}
         </div>
-        <div>
-          <h2 className="font-bold text-slate-800">{activeConversation.name}</h2>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h2 className="font-bold text-slate-800">{activeConversation.name}</h2>
+            {/* Quick-access tab chips next to the name */}
+            <div className="flex gap-1">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => onRightTabChange?.(activeRightTab === tab.key ? null : tab.key)}
+                  className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border transition-all ${
+                    activeRightTab === tab.key
+                      ? 'text-white border-transparent'
+                      : 'text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600 bg-white'
+                  }`}
+                  style={activeRightTab === tab.key ? { background: 'linear-gradient(135deg, #818cf8, #7c3aed)', border: 'none' } : {}}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {activeConversation.isGroup ? (
             <p className="text-xs text-slate-400">{t('chat.groupChat')}</p>
           ) : (() => {
@@ -365,7 +389,7 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
   const isVideo = msg.media_type === 'video'
   const isDocument = msg.media_type === 'document' || msg.media_type === 'file'
   const isMedia = msg.media_type !== 'text'
-  const ts = msg.timestamp ? format(new Date(msg.timestamp), 'HH:mm') : ''
+  const ts = formatIST(msg.timestamp)
   const reactions = Object.entries(msg.reactions || {})
 
   const handleEditSubmit = () => {
@@ -468,7 +492,7 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
                     onError={(e) => { e.target.style.display = 'none' }}
                   />
                 )
-                : <div className="flex items-center gap-2 text-xs opacity-80"><Image size={14} /> Image unavailable</div>
+                : <div className="flex items-center gap-2 text-xs opacity-80"><ImageIcon size={14} /> Image unavailable</div>
               }
             </div>
           ) : isVideo ? (
@@ -534,14 +558,14 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
 
 function StatusIcon({ status, timestamp }) {
   const configs = {
-    read:      { icon: <CheckCheck size={14} />, color: 'text-indigo-400', label: 'Read' },
-    delivered: { icon: <CheckCheck size={14} />, color: 'text-slate-400',  label: 'Delivered' },
-    sent:      { icon: <Check size={14} />,      color: 'text-slate-400',  label: 'Sent' },
-    queued:    { icon: <Check size={14} />,      color: 'text-slate-300',  label: 'Queued' },
-    failed:    { icon: <Check size={14} />,      color: 'text-red-400',    label: 'Failed' },
+    read:      { icon: <CheckCheck size={15} />, color: 'text-sky-500',   label: 'Read' },
+    delivered: { icon: <CheckCheck size={15} />, color: 'text-slate-400', label: 'Delivered' },
+    sent:      { icon: <Check size={14} />,      color: 'text-slate-400', label: 'Sent' },
+    queued:    { icon: <Check size={14} />,      color: 'text-slate-300', label: 'Queued' },
+    failed:    { icon: <Check size={14} />,      color: 'text-red-400',   label: 'Failed' },
   }
   const cfg = configs[status] || configs.sent
-  const timeLabel = timestamp ? `${cfg.label} · ${format(new Date(timestamp), 'HH:mm')}` : cfg.label
+  const timeLabel = timestamp ? `${cfg.label} · ${formatIST(timestamp)}` : cfg.label
 
   return (
     <span className="relative group/status inline-flex cursor-default">

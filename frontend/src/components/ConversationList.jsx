@@ -1,17 +1,16 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Search, Users, MessageSquare, Plus } from 'lucide-react'
-import { format, isToday, isYesterday } from 'date-fns'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
+import { formatIST, isISTToday, isISTYesterday } from '../utils/time'
 import client from '../api/client'
 
 function formatLastSeen(ts) {
   if (!ts) return 'offline'
-  const d = new Date(ts)
-  if (isToday(d)) return `last seen at ${format(d, 'HH:mm')}`
-  if (isYesterday(d)) return 'last seen yesterday'
-  return `last seen ${format(d, 'dd MMM')}`
+  if (isISTToday(ts)) return `last seen at ${formatIST(ts)}`
+  if (isISTYesterday(ts)) return 'last seen yesterday'
+  return `last seen ${formatIST(ts, 'dd MMM')}`
 }
 
 export default function ConversationList({ onCreateGroup }) {

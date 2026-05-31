@@ -188,3 +188,83 @@ async def remove_member(
             "DELETE FROM group_members WHERE group_id=$1 AND user_id=$2", group_id, user_id
         )
     return {"message": "Member removed"}
+
+
+@router.put("/{group_id}")
+async def update_group(group_id: str, data: dict, current_user=Depends(get_current_user)):
+    pool = get_pg_pool()
+    async with pool.acquire() as conn:
+        admin = await conn.fetchrow(
+            "SELECT role FROM group_members WHERE group_id=$1 AND user_id=$2",
+            group_id, current_user.user_id,
+        )
+        if not admin or admin["role"] != "admin":
+            raise HTTPException(status_code=403, detail="Only admins can edit the group")
+
+        await conn.execute(
+            "UPDATE groups SET group_name=$1, description=$2 WHERE group_id=$3",
+            data.get("group_name", "").strip() or None,
+            data.get("description", ""),
+            group_id,
+        )
+
+    from src.messaging.websocket_manager import get_connection_manager
+    manager = get_connection_manager()
+    await manager.broadcast_to_group(group_id, {
+        "type": "group_updated",
+        "data": {"group_id": group_id, "group_name": data.get("group_name"), "description": data.get("description")},
+    })
+    return {"message": "Group updated"}
+
+
+@router.delete("/{group_id}")
+async def delete_group(group_id: str, current_user=Depends(get_current_user)):
+    pool = get_pg_pool()
+    async with pool.acquire() as conn:
+        admin = await conn.fetchrow(
+            "SELECT role FROM group_members WHERE group_id=$1 AND user_id=$2",
+            group_id, current_user.user_id,
+        )
+        if not admin or admin["role"] != "admin":
+            raise HTTPException(status_code=403, detail="Only admins can delete the group")
+
+        member_ids = await conn.fetch(
+            "SELECT user_id FROM group_members WHERE group_id=$1", group_id
+        )
+        async with conn.transaction():
+            await conn.execute("DELETE FROM group_members WHERE group_id=$1", group_id)
+            await conn.execute("DELETE FROM groups WHERE group_id=$1", group_id)
+
+    from src.messaging.websocket_manager import get_connection_manager
+    manager = get_connection_manager()
+    for row in member_ids:
+        await manager.send_to_user(str(row["user_id"]), {
+            "type": "group_removed",
+            "data": {"group_id": group_id},
+        })
+    logger.info("group_deleted", group_id=group_id, by=current_user.user_id)
+    return {"message": "Group deleted"}
+
+
+@router.put("/{group_id}/members/{user_id}/role")
+async def set_member_role(
+    group_id: str, user_id: str, data: dict, current_user=Depends(get_current_user)
+):
+    role = data.get("role", "member")
+    if role not in ("admin", "member"):
+        raise HTTPException(status_code=400, detail="Role must be 'admin' or 'member'")
+
+    pool = get_pg_pool()
+    async with pool.acquire() as conn:
+        admin = await conn.fetchrow(
+            "SELECT role FROM group_members WHERE group_id=$1 AND user_id=$2",
+            group_id, current_user.user_id,
+        )
+        if not admin or admin["role"] != "admin":
+            raise HTTPException(status_code=403, detail="Only admins can change roles")
+
+        await conn.execute(
+            "UPDATE group_members SET role=$1 WHERE group_id=$2 AND user_id=$3",
+            role, group_id, user_id,
+        )
+    return {"message": f"Role set to {role}"}

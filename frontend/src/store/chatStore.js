@@ -10,10 +10,22 @@ export const useChatStore = create((set, get) => ({
   typingUsers: {},
   unreadCounts: {},
   dmRefreshKey: 0,
+  notifications: [],
 
   setActiveConversation: (conv) => set({ activeConversation: conv }),
   setConversations: (list) => set({ conversations: list }),
   setGroups: (list) => set({ groups: list }),
+
+  updateGroup: (groupId, updates) =>
+    set((s) => ({
+      groups: s.groups.map((g) => g.group_id === groupId ? { ...g, ...updates } : g),
+    })),
+
+  removeGroup: (groupId) =>
+    set((s) => ({
+      groups: s.groups.filter((g) => g.group_id !== groupId),
+      activeConversation: s.activeConversation?.id === groupId ? null : s.activeConversation,
+    })),
 
   addMessage: (convId, message) =>
     set((s) => ({
@@ -105,4 +117,19 @@ export const useChatStore = create((set, get) => ({
         lastSeen: { ...s.lastSeen, [userId]: lastSeenAt || new Date().toISOString() },
       }
     }),
+
+  // Notifications
+  setNotifications: (list) => set({ notifications: list }),
+
+  addNotification: (notif) =>
+    set((s) => {
+      const exists = s.notifications.some((n) => n.notification_id === notif.notification_id)
+      if (exists) return s
+      return { notifications: [notif, ...s.notifications].slice(0, 100) }
+    }),
+
+  markNotificationsRead: () =>
+    set((s) => ({
+      notifications: s.notifications.map((n) => ({ ...n, is_read: true })),
+    })),
 }))

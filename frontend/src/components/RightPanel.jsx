@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Users, Loader2, Sparkles, Search, Bot, Settings, Mail, Clock, Mic, Video, FileText } from 'lucide-react'
+import { Users, Loader2, Sparkles, Search, Bot, Settings, Mail, Clock, Mic, Video, FileText, Pencil, Trash2, Shield, ShieldOff, UserMinus, UserPlus, Check, X } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
+import { useAuthStore } from '../store/authStore'
 import client from '../api/client'
 import toast from 'react-hot-toast'
 import NotificationsDropdown from './NotificationsDropdown'
@@ -13,27 +14,47 @@ function resolveUrl(url) {
   return url.startsWith('http') ? url : `${API_BASE}${url}`
 }
 
-export default function RightPanel({ onSearchOpen, showAI, onAIToggle, onSettingsOpen }) {
+export default function RightPanel({ onSearchOpen, showAI, onAIToggle, onSettingsOpen, activeTab, onTabChange }) {
   const { t, i18n } = useTranslation()
   const { activeConversation, messages } = useChatStore()
+  const { user: currentUser } = useAuthStore()
 
-  const [groupTab, setGroupTab] = useState('members')
   const [members, setMembers] = useState([])
   const [summary, setSummary] = useState(null)
   const [summarising, setSummarising] = useState(false)
+  const [myRole, setMyRole] = useState('member')
 
   const [dmTab, setDmTab] = useState('info')
   const [otherUser, setOtherUser] = useState(null)
   const [userLoading, setUserLoading] = useState(false)
 
+  // Group edit state
+  const [editing, setEditing] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editDesc, setEditDesc] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
+
+  // Add member search state
+  const [addSearch, setAddSearch] = useState('')
+  const [addResults, setAddResults] = useState([])
+  const [addSearching, setAddSearching] = useState(false)
+
   const convId = activeConversation?.id
   const convMessages = messages[convId] || []
   const sharedMedia = convMessages.filter((m) => m.media_type !== 'text' && !m.deleted)
 
+  // Derive active group tab from prop or default
+  const groupTab = (activeConversation?.isGroup ? activeTab : null) || 'members'
+  const dmTabActive = (!activeConversation?.isGroup ? activeTab : null) || 'info'
+
   useEffect(() => {
-    if (!activeConversation?.isGroup) { setMembers([]); return }
+    if (!activeConversation?.isGroup) { setMembers([]); setMyRole('member'); return }
     client.get(`/groups/${activeConversation.id}`)
-      .then((r) => setMembers(r.data.members || []))
+      .then((r) => {
+        setMembers(r.data.members || [])
+        const me = (r.data.members || []).find((m) => m.user_id === currentUser?.user_id)
+        setMyRole(me?.role || 'member')
+      })
       .catch(() => {})
   }, [activeConversation?.id])
 
@@ -56,8 +77,78 @@ export default function RightPanel({ onSearchOpen, showAI, onAIToggle, onSetting
     } catch { toast.error('Summary failed') } finally { setSummarising(false) }
   }
 
+  const handleEditSave = async () => {
+    if (!editName.trim()) return
+    setEditLoading(true)
+    try {
+      await client.put(`/groups/${convId}`, { group_name: editName.trim(), description: editDesc.trim() })
+      useChatStore.getState().updateGroup(convId, { group_name: editName.trim(), description: editDesc.trim() })
+      toast.success('Group updated')
+      setEditing(false)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Update failed')
+    } finally { setEditLoading(false) }
+  }
+
+  const handleDeleteGroup = async () => {
+    if (!window.confirm(`Delete "${activeConversation.name}"? This cannot be undone.`)) return
+    try {
+      await client.delete(`/groups/${convId}`)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Delete failed')
+    }
+  }
+
+  const handleRoleToggle = async (member) => {
+    const newRole = member.role === 'admin' ? 'member' : 'admin'
+    try {
+      await client.put(`/groups/${convId}/members/${member.user_id}/role`, { role: newRole })
+      setMembers((prev) => prev.map((m) => m.user_id === member.user_id ? { ...m, role: newRole } : m))
+      toast.success(`${member.display_name} is now ${newRole === 'admin' ? 'an admin' : 'a member'}`)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to update role')
+    }
+  }
+
+  const handleRemoveMember = async (member) => {
+    if (!window.confirm(`Remove ${member.display_name} from the group?`)) return
+    try {
+      await client.delete(`/groups/${convId}/members/${member.user_id}`)
+      setMembers((prev) => prev.filter((m) => m.user_id !== member.user_id))
+      toast.success(`${member.display_name} removed`)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to remove member')
+    }
+  }
+
+  const handleAddSearch = async (q) => {
+    setAddSearch(q)
+    if (q.length < 2) { setAddResults([]); return }
+    setAddSearching(true)
+    try {
+      const r = await client.get(`/users/search?q=${encodeURIComponent(q)}`)
+      const existingIds = new Set(members.map((m) => m.user_id))
+      setAddResults(r.data.filter((u) => !existingIds.has(u.user_id)))
+    } catch { setAddResults([]) }
+    finally { setAddSearching(false) }
+  }
+
+  const handleAddMember = async (u) => {
+    try {
+      await client.post(`/groups/${convId}/members`, { user_id: u.user_id })
+      setMembers((prev) => [...prev, { user_id: u.user_id, display_name: u.display_name, role: 'member', user_presence: 'offline' }])
+      setAddSearch('')
+      setAddResults([])
+      toast.success(`${u.display_name} added`)
+    } catch (err) {
+      toast.error(err.response?.data?.detail || 'Failed to add member')
+    }
+  }
+
+  const isAdmin = myRole === 'admin'
+
   return (
-    <div className="w-60 flex flex-col bg-white border-l border-slate-100 flex-shrink-0 shadow-sm">
+    <div className="w-64 flex flex-col bg-white border-l border-slate-100 flex-shrink-0 shadow-sm">
       {/* Toolbar */}
       <div className="px-2 py-2.5 border-b border-slate-100 flex items-center justify-end gap-0.5">
         <button
@@ -78,9 +169,7 @@ export default function RightPanel({ onSearchOpen, showAI, onAIToggle, onSetting
         <button
           onClick={onAIToggle}
           className={`p-1.5 rounded-lg transition-all ${
-            showAI
-              ? 'text-indigo-600 bg-indigo-50'
-              : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
+            showAI ? 'text-indigo-600 bg-indigo-50' : 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50'
           }`}
           title="AI Assistant"
         >
@@ -107,18 +196,39 @@ export default function RightPanel({ onSearchOpen, showAI, onAIToggle, onSetting
         </div>
       ) : activeConversation.isGroup ? (
         <GroupPanel
-          members={members}
+          convId={convId}
           groupTab={groupTab}
-          setGroupTab={setGroupTab}
+          onTabChange={onTabChange}
+          members={members}
+          myRole={myRole}
+          isAdmin={isAdmin}
           summary={summary}
           summarising={summarising}
           onSummary={handleSummary}
+          editing={editing}
+          editName={editName}
+          editDesc={editDesc}
+          editLoading={editLoading}
+          onEditStart={() => { setEditName(activeConversation.name); setEditDesc(''); setEditing(true) }}
+          onEditCancel={() => setEditing(false)}
+          onEditNameChange={setEditName}
+          onEditDescChange={setEditDesc}
+          onEditSave={handleEditSave}
+          onDeleteGroup={handleDeleteGroup}
+          onRoleToggle={handleRoleToggle}
+          onRemoveMember={handleRemoveMember}
+          addSearch={addSearch}
+          addResults={addResults}
+          addSearching={addSearching}
+          onAddSearch={handleAddSearch}
+          onAddMember={handleAddMember}
+          currentUserId={currentUser?.user_id}
           t={t}
         />
       ) : (
         <DmPanel
-          dmTab={dmTab}
-          setDmTab={setDmTab}
+          dmTab={dmTabActive}
+          onTabChange={onTabChange}
           otherUser={otherUser}
           userLoading={userLoading}
           sharedMedia={sharedMedia}
@@ -128,22 +238,31 @@ export default function RightPanel({ onSearchOpen, showAI, onAIToggle, onSetting
   )
 }
 
-function GroupPanel({ members, groupTab, setGroupTab, summary, summarising, onSummary, t }) {
+function GroupPanel({
+  convId, groupTab, onTabChange, members, myRole, isAdmin,
+  summary, summarising, onSummary,
+  editing, editName, editDesc, editLoading,
+  onEditStart, onEditCancel, onEditNameChange, onEditDescChange, onEditSave, onDeleteGroup,
+  onRoleToggle, onRemoveMember,
+  addSearch, addResults, addSearching, onAddSearch, onAddMember,
+  currentUserId, t,
+}) {
   return (
     <>
-      <div className="flex border-b border-slate-100 text-xs font-medium">
+      {/* Tab bar */}
+      <div className="flex border-b border-slate-100 text-xs font-semibold">
         <button
-          onClick={() => setGroupTab('members')}
+          onClick={() => onTabChange?.('members')}
           className={`flex-1 py-2.5 flex items-center justify-center gap-1 transition-all ${
-            groupTab === 'members' ? 'text-indigo-600 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-700'
+            groupTab === 'members' ? 'text-violet-600 border-b-2 border-violet-500 bg-violet-50/30' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           <Users size={13} /> Members
         </button>
         <button
-          onClick={() => setGroupTab('summary')}
+          onClick={() => onTabChange?.('summary')}
           className={`flex-1 py-2.5 flex items-center justify-center gap-1 transition-all ${
-            groupTab === 'summary' ? 'text-indigo-600 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-700'
+            groupTab === 'summary' ? 'text-violet-600 border-b-2 border-violet-500 bg-violet-50/30' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           <Sparkles size={13} /> Summary
@@ -151,30 +270,143 @@ function GroupPanel({ members, groupTab, setGroupTab, summary, summarising, onSu
       </div>
 
       {groupTab === 'members' ? (
-        <div className="flex-1 overflow-y-auto scrollbar-thin">
-          {members.map((m) => (
-            <div key={m.user_id} className="flex items-center gap-2.5 px-4 py-2.5 hover:bg-indigo-50/40 transition-all">
-              <div className="relative flex-shrink-0">
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-xs text-white font-semibold"
-                  style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}
-                >
-                  {m.display_name.slice(0, 2).toUpperCase()}
+        <div className="flex-1 overflow-y-auto scrollbar-thin flex flex-col">
+          {/* Admin: Edit group name/description */}
+          {isAdmin && (
+            <div className="px-3 py-2 border-b border-slate-100">
+              {editing ? (
+                <div className="space-y-2">
+                  <input
+                    value={editName}
+                    onChange={(e) => onEditNameChange(e.target.value)}
+                    placeholder="Group name"
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300"
+                  />
+                  <input
+                    value={editDesc}
+                    onChange={(e) => onEditDescChange(e.target.value)}
+                    placeholder="Description (optional)"
+                    className="w-full px-2.5 py-1.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300"
+                  />
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={onEditSave}
+                      disabled={editLoading || !editName.trim()}
+                      className="flex-1 py-1.5 text-xs text-white rounded-lg font-semibold disabled:opacity-50 transition-all"
+                      style={{ background: 'linear-gradient(135deg, #6366f1, #7c3aed)' }}
+                    >
+                      {editLoading ? <Loader2 size={12} className="inline animate-spin" /> : 'Save'}
+                    </button>
+                    <button
+                      onClick={onEditCancel}
+                      className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 border border-slate-200 rounded-lg transition-all"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <button
+                    onClick={onDeleteGroup}
+                    className="w-full py-1.5 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-100 rounded-lg transition-all font-semibold"
+                  >
+                    <Trash2 size={11} className="inline mr-1" /> Delete Group
+                  </button>
                 </div>
-                <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                  m.user_presence === 'online' ? 'bg-emerald-400' : 'bg-slate-300'
-                }`} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs font-semibold text-slate-800 truncate">{m.display_name}</p>
-                {m.role === 'admin' && (
-                  <span className="text-xs font-medium" style={{ color: '#6366f1' }}>admin</span>
+              ) : (
+                <button
+                  onClick={onEditStart}
+                  className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-violet-600 hover:bg-violet-50 px-2 py-1.5 rounded-lg w-full transition-all"
+                >
+                  <Pencil size={12} /> Edit group
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Member list */}
+          <div className="flex-1 overflow-y-auto">
+            {members.map((m) => (
+              <div key={m.user_id} className="flex items-center gap-2 px-3 py-2.5 hover:bg-slate-50 transition-all group">
+                <div className="relative flex-shrink-0">
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center text-xs text-white font-semibold"
+                    style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}
+                  >
+                    {m.display_name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <span className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${
+                    m.user_presence === 'online' ? 'bg-emerald-400' : 'bg-slate-300'
+                  }`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-slate-800 truncate">{m.display_name}</p>
+                  {m.role === 'admin' && (
+                    <span className="text-xs font-medium text-violet-600">admin</span>
+                  )}
+                </div>
+                {/* Admin actions — shown on hover, hidden for self */}
+                {isAdmin && m.user_id !== currentUserId && (
+                  <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => onRoleToggle(m)}
+                      className={`p-1 rounded-md transition-all ${
+                        m.role === 'admin'
+                          ? 'text-violet-400 hover:text-violet-600 hover:bg-violet-50'
+                          : 'text-slate-400 hover:text-violet-600 hover:bg-violet-50'
+                      }`}
+                      title={m.role === 'admin' ? 'Remove admin' : 'Make admin'}
+                    >
+                      {m.role === 'admin' ? <ShieldOff size={13} /> : <Shield size={13} />}
+                    </button>
+                    <button
+                      onClick={() => onRemoveMember(m)}
+                      className="p-1 rounded-md text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all"
+                      title="Remove from group"
+                    >
+                      <UserMinus size={13} />
+                    </button>
+                  </div>
                 )}
               </div>
+            ))}
+          </div>
+
+          {/* Admin: Add member */}
+          {isAdmin && (
+            <div className="px-3 py-2 border-t border-slate-100">
+              <div className="relative">
+                <UserPlus size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={addSearch}
+                  onChange={(e) => onAddSearch(e.target.value)}
+                  placeholder="Add member…"
+                  className="w-full pl-7 pr-2 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-300"
+                />
+              </div>
+              {addSearching && <p className="text-xs text-slate-400 mt-1">Searching…</p>}
+              {addResults.length > 0 && (
+                <div className="mt-1 border border-slate-100 rounded-lg overflow-hidden max-h-28 overflow-y-auto">
+                  {addResults.map((u) => (
+                    <button
+                      key={u.user_id}
+                      onClick={() => onAddMember(u)}
+                      className="w-full flex items-center gap-2 px-2 py-1.5 hover:bg-violet-50 text-left transition-all"
+                    >
+                      <div
+                        className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}
+                      >
+                        {u.display_name.slice(0, 1).toUpperCase()}
+                      </div>
+                      <span className="text-xs text-slate-700 font-medium truncate">{u.display_name}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
+          )}
         </div>
       ) : (
+        /* Summary tab */
         <div className="flex-1 overflow-y-auto p-3 scrollbar-thin">
           <button
             onClick={onSummary}
@@ -197,29 +429,29 @@ function GroupPanel({ members, groupTab, setGroupTab, summary, summarising, onSu
   )
 }
 
-function DmPanel({ dmTab, setDmTab, otherUser, userLoading, sharedMedia }) {
+function DmPanel({ dmTab, onTabChange, otherUser, userLoading, sharedMedia }) {
   return (
     <>
-      <div className="flex border-b border-slate-100 text-xs font-medium">
+      <div className="flex border-b border-slate-100 text-xs font-semibold">
         <button
-          onClick={() => setDmTab('info')}
+          onClick={() => onTabChange?.('info')}
           className={`flex-1 py-2.5 transition-all ${
-            dmTab === 'info' ? 'text-indigo-600 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-700'
+            dmTab === 'info' ? 'text-violet-600 border-b-2 border-violet-500 bg-violet-50/30' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           Info
         </button>
         <button
-          onClick={() => setDmTab('shared')}
+          onClick={() => onTabChange?.('shared')}
           className={`flex-1 py-2.5 transition-all ${
-            dmTab === 'shared' ? 'text-indigo-600 border-b-2 border-indigo-500' : 'text-slate-500 hover:text-slate-700'
+            dmTab === 'shared' ? 'text-violet-600 border-b-2 border-violet-500 bg-violet-50/30' : 'text-slate-500 hover:text-slate-700'
           }`}
         >
           Shared ({sharedMedia.length})
         </button>
       </div>
 
-      {dmTab === 'info' ? (
+      {dmTab !== 'shared' ? (
         <div className="flex-1 overflow-y-auto scrollbar-thin">
           {userLoading ? (
             <div className="flex items-center justify-center p-6">
@@ -243,14 +475,12 @@ function DmPanel({ dmTab, setDmTab, otherUser, userLoading, sharedMedia }) {
                   </p>
                 </div>
               </div>
-
               {otherUser.email && (
                 <div className="flex items-start gap-2 py-2.5 border-t border-slate-100">
                   <Mail size={13} className="text-indigo-300 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-slate-600 break-all">{otherUser.email}</p>
                 </div>
               )}
-
               {otherUser.status && (
                 <div className="flex items-start gap-2 py-2.5 border-t border-slate-100">
                   <Clock size={13} className="text-indigo-300 flex-shrink-0 mt-0.5" />
@@ -281,7 +511,6 @@ function DmPanel({ dmTab, setDmTab, otherUser, userLoading, sharedMedia }) {
 
 function MediaThumb({ msg }) {
   const url = resolveUrl(msg.media_url)
-
   if (msg.media_type === 'image') {
     return (
       <img
