@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
+from pydantic import BaseModel
 
 from src.auth.dependencies import get_current_user
 from src.messaging.schemas import (
@@ -248,6 +249,45 @@ async def delete_message(message_id: str, current_user=Depends(get_current_user)
     await manager.send_to_user(current_user.user_id, event)
 
     return {"status": "deleted"}
+
+
+class SuggestRepliesRequest(BaseModel):
+    message: str
+    context: List[str] = []
+
+
+@router.post("/suggest-replies")
+async def suggest_replies(
+    data: SuggestRepliesRequest,
+    current_user=Depends(get_current_user),
+):
+    import json, re
+    from src.ai.gemini_client import generate_text
+
+    context_block = ""
+    if data.context:
+        context_block = "Recent conversation:\n" + "\n".join(f"- {m}" for m in data.context[-4:]) + "\n\n"
+
+    prompt = (
+        f"{context_block}"
+        f"Latest message received: \"{data.message}\"\n\n"
+        "Generate exactly 3 short, natural reply suggestions (each under 10 words). "
+        "Return ONLY a JSON array of 3 strings, no explanation or markdown."
+    )
+
+    try:
+        raw = await generate_text(prompt, temperature=0.6, max_tokens=120)
+        match = re.search(r'\[.*?\]', raw, re.DOTALL)
+        if match:
+            suggestions = json.loads(match.group())
+            suggestions = [str(s).strip() for s in suggestions if s][:3]
+        else:
+            suggestions = []
+    except Exception as e:
+        logger.warning("suggest_replies_failed", error=str(e))
+        suggestions = []
+
+    return {"suggestions": suggestions}
 
 
 @router.post("/{message_id}/react")

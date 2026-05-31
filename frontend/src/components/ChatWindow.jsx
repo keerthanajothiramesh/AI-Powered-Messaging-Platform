@@ -33,6 +33,7 @@ export default function ChatWindow() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [recording, setRecording] = useState(false)
+  const [suggestions, setSuggestions] = useState([])
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
@@ -68,6 +69,17 @@ export default function ChatWindow() {
   }, [convMessages.length])
 
   useEffect(() => {
+    if (!convId || convMessages.length === 0) { setSuggestions([]); return }
+    const last = convMessages[convMessages.length - 1]
+    if (last.sender_id === user?.user_id) { setSuggestions([]); return }
+    if (last.media_type !== 'text' || last.deleted) { setSuggestions([]); return }
+    const context = convMessages.slice(-5, -1).map((m) => m.content)
+    client.post('/messages/suggest-replies', { message: last.content, context })
+      .then((r) => setSuggestions(r.data.suggestions || []))
+      .catch(() => setSuggestions([]))
+  }, [convMessages.length, convId])
+
+  useEffect(() => {
     return () => {
       clearInterval(timerRef.current)
       mediaRecorderRef.current?.stream?.getTracks().forEach((t) => t.stop())
@@ -94,6 +106,7 @@ export default function ChatWindow() {
     if (!text || !convId) return
     sendMessage(text, convId, activeConversation.isGroup)
     setInput('')
+    setSuggestions([])
   }
 
   const handleKeyDown = (e) => {
@@ -236,6 +249,20 @@ export default function ChatWindow() {
         ))}
         <div ref={bottomRef} />
       </div>
+
+      {suggestions.length > 0 && !input && (
+        <div className="px-4 pb-1 flex gap-2 flex-wrap">
+          {suggestions.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => { setInput(s); setSuggestions([]) }}
+              className="px-3 py-1 bg-primary/8 hover:bg-primary/15 text-primary border border-primary/20 rounded-full text-xs transition-colors"
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
 
       {typingUsers[convId] && (
         <div className="px-6 pb-1 flex items-center gap-2 text-xs text-gray-400">
