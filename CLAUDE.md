@@ -3,7 +3,7 @@
 ## What Was Built
 A full-stack AI-powered messaging platform POC featuring:
 - Real-time 1:1 and group messaging via WebSocket
-- AI semantic search with hybrid BM25 + ChromaDB retrieval
+- AI semantic search with hybrid BM25 + pgvector retrieval
 - RAG-enabled conversation summarisation using Gemini 1.5 Flash
 - Multi-agent orchestration (Search, Summarisation, Moderation, Notification, Delivery)
 - LLM-as-Judge quality validation for summaries
@@ -12,7 +12,7 @@ A full-stack AI-powered messaging platform POC featuring:
 - Synthetic dataset: 150 users, 25 groups, 60,000 messages
 
 ## Key Technical Decisions
-1. **Polyglot persistence**: Neon PostgreSQL (users/groups) + MongoDB Atlas (messages/events) + ChromaDB (embeddings)
+1. **Polyglot persistence**: Neon PostgreSQL + pgvector (users/groups/embeddings) + MongoDB Atlas (messages/events)
 2. **Hybrid search**: BM25 + semantic via Reciprocal Rank Fusion — better precision than pure semantic
 3. **Gemini 1.5 Flash**: Chosen for 1M context window, multilingual support, native function calling
 4. **WebSocket**: Full-duplex for <500ms delivery; offline queue via MongoDB TTL index (30 days)
@@ -26,7 +26,7 @@ Frontend (React 18 + Vite + TailwindCSS)
 FastAPI Backend (Python 3.12)
     ├── Auth (JWT + bcrypt)
     ├── Messaging (WebSocket + REST)
-    ├── AI (Embeddings + ChromaDB + Gemini + RAG)
+    ├── AI (Embeddings + pgvector + Gemini + RAG)
     ├── Search (BM25 + Semantic + RRF)
     ├── Agents (Orchestrator → Specialized Agents)
     ├── Media (S3 + local fallback)
@@ -34,7 +34,7 @@ FastAPI Backend (Python 3.12)
          ↕
     Neon PostgreSQL (users, groups)
     MongoDB Atlas (messages, media, events)
-    ChromaDB Local (embeddings)
+    Neon PostgreSQL pgvector (embeddings)
     Gemini API (LLM)
 ```
 
@@ -44,7 +44,7 @@ FastAPI Backend (Python 3.12)
 | FastAPI App | `src/main.py` | App entry point, lifespan management |
 | WebSocket Manager | `src/messaging/websocket_manager.py` | Real-time presence + message delivery |
 | Embedding Service | `src/ai/embedding_service.py` | sentence-transformers all-MiniLM-L6-v2 |
-| Vector Store | `src/ai/vector_store.py` | ChromaDB operations |
+| Vector Store | `src/ai/vector_store.py` | pgvector operations (cosine similarity via `<=>`) |
 | Gemini Client | `src/ai/gemini_client.py` | LLM with circuit breaker |
 | RAG Service | `src/ai/rag_service.py` | Summarisation + catch-up |
 | Hybrid Search | `src/search/search_service.py` | BM25 + semantic + RRF |
@@ -73,7 +73,7 @@ FastAPI Backend (Python 3.12)
 
 ## Known Limitations (POC vs Production)
 - WebSocket horizontal scaling needs Redis pub/sub (currently in-memory)
-- ChromaDB local — needs Pinecone/Weaviate for production scale
+- pgvector on Neon free tier — needs Pinecone/Weaviate for 100M+ vector production scale
 - Single Gemini model — production needs load balancing across API keys
 - No E2E encryption implemented (architecture noted, not built in POC)
 - BM25 corpus loaded from MongoDB on search — needs caching layer for production

@@ -13,7 +13,7 @@ sequenceDiagram
     participant MsgSvc as Messaging Service
     participant Mongo as MongoDB Atlas
     participant EmbSvc as Embedding Service
-    participant Chroma as ChromaDB
+    participant PGVec as pgvector (Neon)
 
     Client->>WS: WS connect + JWT auth
     WS->>WS: Authenticate token, register connection
@@ -27,10 +27,10 @@ sequenceDiagram
     MsgSvc->>WS: broadcast to online group members
     WS-->>Client: {type: "message", data: {...}}
 
-    Note over MsgSvc,Chroma: Background embedding (non-blocking)
+    Note over MsgSvc,PGVec: Background embedding (non-blocking)
     MsgSvc->>EmbSvc: embed(content) → 384-dim vector
-    EmbSvc->>Chroma: upsert(message_id, vector, metadata)
-    Chroma-->>EmbSvc: ok
+    EmbSvc->>PGVec: INSERT INTO message_embeddings (message_id, embedding, metadata)
+    PGVec-->>EmbSvc: ok
 
     Note over MsgSvc,Mongo: Offline delivery queue
     MsgSvc->>Mongo: update delivery_status="failed"<br/>for offline receivers
@@ -47,7 +47,7 @@ flowchart TD
     A[generate_dataset.py<br/>Faker — 150 users · 25 groups · 60k msgs] --> B[load_postgres.py<br/>Users + Groups → Neon PostgreSQL<br/>asyncpg connection pool]
     B --> C[load_mongo.py<br/>Messages + Events → MongoDB Atlas<br/>Motor async bulk insert<br/>batch size = 1000]
     C --> D[generate_embeddings.py<br/>Load messages from Mongo<br/>Batch embed via fastembed BAAI/bge-small-en-v1.5<br/>ONNX runtime — no GPU needed]
-    D --> E[ChromaDB<br/>Upsert vectors with metadata<br/>group_id · sender_id · timestamp · language]
+    D --> E[pgvector on Neon<br/>INSERT INTO message_embeddings<br/>group_id · sender_id · timestamp · language]
 
     style A fill:#f0f4ff
     style E fill:#e8f5e9
@@ -81,12 +81,19 @@ messages: {
 }
 ```
 
-### ChromaDB (Local)
-```
-collection: "messages"
-  id:        message_id (string)
-  embedding: [384 floats]  — BAAI/bge-small-en-v1.5
-  metadata:  {group_id, sender_id, timestamp, language, content_preview}
+### pgvector on Neon PostgreSQL
+```sql
+message_embeddings (
+  message_id  TEXT PRIMARY KEY,
+  embedding   vector(384),        -- BAAI/bge-small-en-v1.5 via fastembed
+  content     TEXT,
+  sender_id   TEXT,
+  group_id    TEXT,
+  receiver_id TEXT,
+  media_type  TEXT,
+  language    TEXT
+)
+-- Cosine similarity index: embedding <=> query_vector
 ```
 
 ---
@@ -94,6 +101,6 @@ collection: "messages"
 ## Key Design Decisions
 
 - **Async throughout**: asyncpg + Motor ensure zero blocking I/O during ingestion.
-- **Batch upsert to ChromaDB**: 100-message batches to avoid per-insert overhead.
+- **Batch insert to pgvector**: messages embedded and inserted in batches via `ON CONFLICT DO NOTHING` to avoid duplicates.
 - **Embedding at ingest time**: vectors are pre-computed so search has zero embedding latency at query time.
 - **MongoDB TTL index**: messages older than 30 days auto-expire from the failed-delivery queue.

@@ -27,8 +27,6 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MINUTES: int = 1440
     GOOGLE_CLIENT_ID: str = ""
 
-    # ChromaDB
-    CHROMA_DB_PATH: str = "./chroma_db"
     LOCAL_UPLOADS_PATH: str = "./uploads"
 
     class Config:

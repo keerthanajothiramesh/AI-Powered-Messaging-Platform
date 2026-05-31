@@ -69,7 +69,7 @@ Pass threshold: average score ≥ 6.0 AND keyword topic coverage ≥ 50%.
 |---|---|---|
 | Gemini circuit open (3 consecutive failures) | Falls back to Flan-T5 Small on CPU | Yes — circuit_open flag triggers `local_fallback.py` |
 | Flan-T5 not installed | Extractive stub (first 20 words) returned | Yes — graceful `None` pipeline check |
-| ChromaDB unavailable | BM25-only search via MongoDB corpus | Yes — `try/except` in `search_service.py` |
+| pgvector unavailable | BM25-only search via MongoDB corpus | Yes — `try/except` in `search_service.py` |
 | No messages in time window | Returns empty summary with `"No messages found"` | Yes — early return in `rag_service.py` |
 
 ---

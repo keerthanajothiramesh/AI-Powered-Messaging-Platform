@@ -47,9 +47,9 @@ async def ai_health():
 @router.get("/vector")
 async def vector_health():
     try:
-        from src.ai.vector_store import get_vector_store
-        store = get_vector_store()
-        count = store.messages_collection.count()
-        return {"status": "healthy", "chromadb": "healthy", "message_count": count}
+        pool = get_pg_pool()
+        async with pool.acquire() as conn:
+            count = await conn.fetchval("SELECT COUNT(*) FROM message_embeddings")
+        return {"status": "healthy", "pgvector": "healthy", "message_count": count}
     except Exception as e:
-        return {"status": "degraded", "chromadb": f"unhealthy: {str(e)}"}
+        return {"status": "degraded", "pgvector": f"unhealthy: {str(e)}"}

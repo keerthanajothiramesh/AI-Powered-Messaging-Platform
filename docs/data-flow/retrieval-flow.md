@@ -13,7 +13,7 @@ sequenceDiagram
     participant SearchSvc as Search Service
     participant BM25 as BM25 Index (in-memory)
     participant EmbSvc as Embedding Service
-    participant Chroma as ChromaDB
+    participant PGVec as pgvector (Neon)
     participant RRF as RRF Merger
 
     Client->>API: POST /api/search {query, filters, n_results}
@@ -25,8 +25,8 @@ sequenceDiagram
     and Semantic retrieval
         API->>EmbSvc: embed(query) → 384-dim vector
         EmbSvc-->>API: query_vector
-        API->>Chroma: similarity_search(query_vector, n=50)
-        Chroma-->>API: semantic_results[]
+        API->>PGVec: SELECT ... ORDER BY embedding <=> $1 LIMIT 50
+        PGVec-->>API: semantic_results[]
     end
 
     API->>RRF: merge(bm25_results, semantic_results)
@@ -144,7 +144,7 @@ Request
   │     NO (circuit open) → Flan-T5 Small on CPU (local inference)
   │     NO (Flan-T5 unavailable) → Extractive stub (first 20 words)
   │
-  └─► ChromaDB available?
-        YES → Vector similarity search
+  └─► pgvector available?
+        YES → Vector similarity search (cosine distance via <=>)
         NO  → MongoDB full-text search fallback
 ```

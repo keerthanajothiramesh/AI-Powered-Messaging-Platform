@@ -16,9 +16,9 @@ A production-grade POC of an AI-powered real-time messaging platform with semant
 └──────┬──────────────┬──────────────┬────────────────┘
        │              │              │
  ┌─────▼──────┐ ┌─────▼──────┐ ┌───▼────────────────┐
- │   Neon     │ │  MongoDB   │ │  ChromaDB (local)  │
+ │   Neon     │ │  MongoDB   │ │  pgvector on Neon  │
  │ PostgreSQL │ │   Atlas    │ │  + Gemini API      │
- │ users/grps │ │  messages  │ │  + sentence-xfmrs  │
+ │ users/grps │ │  messages  │ │  + fastembed ONNX  │
  └────────────┘ └────────────┘ └────────────────────┘
 ```
 
@@ -73,7 +73,7 @@ python dataset/load_postgres.py
 # Load into MongoDB
 python dataset/load_mongo.py
 
-# Generate ChromaDB embeddings (takes ~10-15 minutes)
+# Generate pgvector embeddings and load into Neon PostgreSQL (takes ~10-15 minutes)
 python dataset/generate_embeddings.py
 ```
 
@@ -191,7 +191,7 @@ Toggle language flag 🇯🇵/🇬🇧 in top right to switch UI language
 | `JWT_EXPIRE_MINUTES` | No | Token expiry (default: 1440) |
 | `AWS_ACCESS_KEY_ID` | No | S3 uploads (falls back to local) |
 | `AWS_SECRET_ACCESS_KEY` | No | S3 uploads |
-| `CHROMA_DB_PATH` | No | ChromaDB path (default: ./chroma_db) |
+| `LOCAL_UPLOADS_PATH` | No | Local uploads folder (default: ./uploads) |
 | `LOCAL_UPLOADS_PATH` | No | Local uploads (default: ./uploads) |
 
 ## Dataset Schema

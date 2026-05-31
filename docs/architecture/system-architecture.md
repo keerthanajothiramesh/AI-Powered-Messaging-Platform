@@ -45,9 +45,8 @@ graph TD
     end
 
     subgraph DataLayer["Data Layer"]
-        PG[(PostgreSQL<br/>Neon<br/>users · groups · embeddings)]
+        PG[(PostgreSQL + pgvector<br/>Neon<br/>users · groups · embeddings)]
         Mongo[(MongoDB Atlas<br/>messages · events · media)]
-        Chroma[(ChromaDB<br/>Local<br/>vector embeddings)]
     end
 
     UI <-->|REST + WebSocket| API
@@ -70,8 +69,8 @@ graph TD
 
     AuthSvc --> PG
     MsgSvc --> Mongo & PG
-    AISvc --> Chroma & PG
-    SearchSvc --> Chroma & Mongo
+    AISvc --> PG
+    SearchSvc --> PG & Mongo
     NotifSvc --> Mongo
     MediaSvc --> Mongo
 ```
@@ -86,7 +85,7 @@ graph TD
 | **Load Balancing** | Single uvicorn worker | Load balancer (nginx / AWS ALB) across ≥3 pods |
 | **Horizontal Scaling** | Single process | Stateless FastAPI pods, autoscaled via Kubernetes HPA |
 | **WebSocket Scaling** | In-memory connection map | Redis Pub/Sub fanout across pods |
-| **Vector DB** | ChromaDB (local disk) | Pinecone / Weaviate (managed, replicated) |
+| **Vector DB** | pgvector on Neon PostgreSQL | Pinecone / Weaviate (managed, horizontally scaled) |
 | **LLM** | Single Gemini API key | Key pool + multiple model tiers (Flash for latency, Pro for quality) |
 | **Message Queue** | MongoDB TTL index as offline queue | Kafka / RabbitMQ for guaranteed delivery |
 | **Secrets** | `.env` file | AWS Secrets Manager / HashiCorp Vault |
@@ -120,7 +119,7 @@ graph LR
 | Pattern | Component | Purpose |
 |---|---|---|
 | Circuit Breaker | `gemini_client.py` | Prevent cascade failure when LLM API is down |
-| Repository | `database.py` | Abstract DB access; swap ChromaDB → Pinecone without touching service layer |
+| Repository | `database.py` | Abstract DB access; swap pgvector → Pinecone without touching service layer |
 | Strategy | `search_service.py` | Pluggable BM25 / Semantic / RRF strategies |
 | Observer | `websocket_manager.py` | Event-driven real-time message delivery |
 | LLM-as-Judge | `judge_agent.py` | Automated quality gate for AI outputs |

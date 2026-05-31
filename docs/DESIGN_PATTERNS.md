@@ -10,7 +10,7 @@ ConnectionManager acts as event bus. Message send triggers delivery to all subsc
 
 ## 3. Strategy Pattern (Search)
 **Location:** `src/search/search_service.py`  
-Pluggable search strategies: BM25 keyword search, ChromaDB semantic search, fused hybrid. Each is swappable.
+Pluggable search strategies: BM25 keyword search, pgvector semantic search, fused hybrid. Each is swappable.
 
 ## 4. Circuit Breaker Pattern
 **Location:** `src/ai/gemini_client.py`  
@@ -22,11 +22,11 @@ Orchestrator creates the appropriate agent based on intent classification. New a
 
 ## 6. Singleton Pattern (Service Instances)
 **Location:** `src/ai/embedding_service.py`, `src/ai/vector_store.py`, `src/messaging/websocket_manager.py`  
-Heavy models (sentence-transformers, ChromaDB) loaded once at startup and reused across requests.
+Heavy models (fastembed/sentence-transformers, pgvector pool) loaded once at startup and reused across requests.
 
 ## 7. RAG Pattern (Retrieval-Augmented Generation)
 **Location:** `src/ai/rag_service.py`  
-Retrieve relevant messages from MongoDB/ChromaDB → build context → generate with Gemini. Grounds LLM in actual chat data.
+Retrieve relevant messages from MongoDB/pgvector → build context → generate with Gemini. Grounds LLM in actual chat data.
 
 ## 8. LLM-as-Judge Pattern
 **Location:** `src/agents/judge_agent.py`  
@@ -42,8 +42,8 @@ Combines ranked lists from BM25 and semantic search without needing to tune scor
 
 ## 11. Graceful Degradation Pattern
 **Location:** `src/ai/gemini_client.py`, `src/search/search_service.py`, `src/media/service.py`  
-- Gemini unavailable → local text stub  
-- ChromaDB unavailable → BM25-only search  
+- Gemini unavailable → Flan-T5 Small (local CPU) → extractive stub  
+- pgvector unavailable → BM25-only search  
 - S3 unavailable → local uploads/ folder
 
 ## 12. Connection Pool Pattern

@@ -10,13 +10,13 @@
 
 ---
 
-## ADR-002: ChromaDB for Vector Storage (vs pgvector)
+## ADR-002: pgvector on Neon PostgreSQL for Vector Storage (vs ChromaDB)
 
 **Status:** Accepted  
-**Context:** Need semantic search across 60,000 messages.  
-**Decision:** Use ChromaDB local persistent client.  
-**Rationale:** Zero-config setup; cosine similarity built-in; persistent on disk; no extra PostgreSQL extension needed; works offline.  
-**Trade-offs:** Single-node only; pgvector would scale better in production with existing PostgreSQL.
+**Context:** Need semantic search across 60,000 messages; already running Neon PostgreSQL for users and groups.  
+**Decision:** Use pgvector extension on the existing Neon PostgreSQL instance (`message_embeddings` table, cosine distance via `<=>` operator).  
+**Rationale:** No additional database to manage; vectors co-located with relational data enabling filtered queries (by group_id, sender_id) in a single SQL statement; Neon handles managed scaling; asyncpg connection pool reused.  
+**Trade-offs:** Single-node Neon free tier has storage limits; Pinecone/Weaviate would scale horizontally for 100M+ vectors. For this POC scale (60k messages), pgvector is sufficient.
 
 ---
 
@@ -44,9 +44,9 @@
 
 **Status:** Accepted  
 **Context:** Need accurate search across chat messages.  
-**Decision:** Reciprocal Rank Fusion of BM25 (rank-bm25) + ChromaDB semantic search.  
+**Decision:** Reciprocal Rank Fusion of BM25 (rank-bm25) + pgvector semantic search.  
 **Rationale:** BM25 excels at exact keyword matches (names, codes); semantic search handles paraphrasing and intent; RRF combines both without tuning weights.  
-**Trade-offs:** Slightly higher latency than pure semantic; requires maintaining both BM25 corpus and vector index.
+**Trade-offs:** Slightly higher latency than pure semantic; requires maintaining both BM25 corpus and pgvector index.
 
 ---
 
@@ -54,9 +54,9 @@
 
 **Status:** Accepted  
 **Context:** Different data types have different optimal storage engines.  
-**Decision:** Neon PostgreSQL (users, groups) + MongoDB Atlas (messages, events) + ChromaDB (embeddings).  
-**Rationale:** Each database optimised for its workload; PostgreSQL for relational integrity; MongoDB for flexible document storage and TTL; ChromaDB for vector similarity.  
-**Trade-offs:** Operational complexity of 3 databases; compensated by managed cloud services.
+**Decision:** Neon PostgreSQL (users, groups, embeddings via pgvector) + MongoDB Atlas (messages, events).  
+**Rationale:** Each database optimised for its workload; PostgreSQL for relational integrity and vector similarity (pgvector extension); MongoDB for flexible document storage and TTL indexes. Consolidating embeddings into PostgreSQL avoided a fourth managed service.  
+**Trade-offs:** Operational complexity of 2 databases; pgvector on Neon free tier has row limits at very large scale (production would move vectors to Pinecone/Weaviate).
 
 ---
 
