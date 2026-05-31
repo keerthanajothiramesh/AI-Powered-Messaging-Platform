@@ -59,7 +59,7 @@ async def seed_demo(
 ):
     if _progress["status"] == "running":
         return {"message": "Seeding already in progress"}
-    background_tasks.add_task(_run_seed, str(current_user["user_id"]))
+    background_tasks.add_task(_run_seed, str(current_user.user_id))
     return {"message": "Seeding started"}
 
 
@@ -93,7 +93,7 @@ async def remove_demo(
 ):
     if _progress["status"] == "removing":
         return {"message": "Removal already in progress"}
-    background_tasks.add_task(_run_remove, str(current_user["user_id"]))
+    background_tasks.add_task(_run_remove, str(current_user.user_id))
     return {"message": "Removal started"}
 
 
