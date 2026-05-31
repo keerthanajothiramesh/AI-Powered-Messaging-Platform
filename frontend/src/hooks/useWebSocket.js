@@ -47,7 +47,11 @@ export function useWebSocket() {
 
   const handleEvent = useCallback((payload) => {
     const { type, data } = payload
-    if (type === 'message') {
+    if (type === 'connected') {
+      if (data.queued_count > 0) {
+        toast(`📬 ${data.queued_count} message${data.queued_count > 1 ? 's' : ''} delivered from while you were offline`)
+      }
+    } else if (type === 'message') {
       const currentUserId = useAuthStore.getState().user?.user_id
       const convId = data.group_id
         || (data.sender_id === currentUserId ? data.receiver_id : data.sender_id)

@@ -136,11 +136,16 @@ async def create_mongo_indexes(db) -> None:
     await db.messages.create_index([("receiver_id", 1), ("timestamp", -1)])
     await db.messages.create_index([("group_id", 1), ("timestamp", -1)])
     await db.messages.create_index([("timestamp", -1)])
+    # Drop legacy TTL index that targeted a non-existent field
+    try:
+        await db.messages.drop_index("offline_queue_ttl")
+    except Exception:
+        pass
+    # Compound index for efficient offline-queue lookups (sparse — only docs with queued_at)
     await db.messages.create_index(
-        [("created_at", 1)],
-        expireAfterSeconds=30 * 24 * 3600,
+        [("receiver_id", 1), ("delivery_status", 1), ("queued_at", 1)],
         sparse=True,
-        name="offline_queue_ttl",
+        name="offline_queue_idx",
     )
     await db.notifications.create_index([("user_id", 1), ("is_read", 1)])
     await db.notifications.create_index([("created_at", -1)])

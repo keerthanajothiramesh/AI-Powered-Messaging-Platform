@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Dict, Any
 from src.common.database import get_mongo_db, get_pg_pool
 from src.common.logger import get_logger
@@ -115,10 +115,12 @@ async def get_group_messages(
 
 async def update_delivery_status(message_id: str, status: str) -> None:
     db = get_mongo_db()
-    await db.messages.update_one(
-        {"message_id": message_id},
-        {"$set": {"delivery_status": status}},
-    )
+    update: dict = {"$set": {"delivery_status": status}}
+    if status == "queued":
+        update["$set"]["queued_at"] = datetime.now(timezone.utc)
+    else:
+        update["$unset"] = {"queued_at": ""}
+    await db.messages.update_one({"message_id": message_id}, update)
 
 
 async def mark_message_read(message_id: str, user_id: str) -> None:
@@ -134,13 +136,31 @@ async def mark_message_read(message_id: str, user_id: str) -> None:
 
 async def get_queued_messages(user_id: str) -> List[Dict]:
     db = get_mongo_db()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
     cursor = db.messages.find(
-        {"receiver_id": user_id, "delivery_status": "queued"}
+        {
+            "receiver_id": user_id,
+            "delivery_status": "queued",
+            "queued_at": {"$gte": cutoff},
+        }
     ).sort("timestamp", 1)
     messages = await cursor.to_list(length=500)
     for m in messages:
         m.pop("_id", None)
     return messages
+
+
+async def expire_stale_queued_messages() -> int:
+    """Mark queued messages older than 30 days as expired so they are skipped on future reconnects."""
+    db = get_mongo_db()
+    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
+    result = await db.messages.update_many(
+        {"delivery_status": "queued", "queued_at": {"$lt": cutoff}},
+        {"$set": {"delivery_status": "expired"}, "$unset": {"queued_at": ""}},
+    )
+    if result.modified_count:
+        logger.info("queued_messages_expired", count=result.modified_count)
+    return result.modified_count
 
 
 async def add_reaction(message_id: str, user_id: str, emoji: str) -> None:
