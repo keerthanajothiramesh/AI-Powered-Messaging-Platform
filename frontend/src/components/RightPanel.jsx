@@ -142,7 +142,7 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
   const isAdmin = myRole === 'admin'
 
   return (
-    <div className="w-64 flex flex-col bg-white border-l border-slate-100 flex-shrink-0 shadow-sm">
+    <div className="w-80 flex flex-col bg-white border-l border-slate-100 flex-shrink-0 shadow-sm">
       {/* Toolbar */}
       <div className="px-2 py-2.5 border-b border-slate-100 flex items-center justify-end gap-0.5">
         <button
@@ -685,7 +685,7 @@ function InlineAIChat({ convId, convName, isGroup, otherUserId }) {
           <div key={i}>
             <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               <div
-                className={`max-w-[92%] text-xs rounded-xl px-3 py-2 leading-relaxed ${
+                className={`max-w-[88%] text-xs rounded-xl px-3 py-2 leading-relaxed ${
                   msg.role === 'user'
                     ? 'text-white rounded-br-sm shadow-sm'
                     : 'bg-slate-50 text-slate-700 border border-slate-100 rounded-bl-sm'

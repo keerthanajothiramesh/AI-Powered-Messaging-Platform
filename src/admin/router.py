@@ -221,16 +221,23 @@ async def _run_seed(requester_user_id: str):
                         )
                     except Exception:
                         pass
+                # Use message_id as _id so re-seeding skips existing docs instead
+                # of inserting duplicates (insert_many ordered=False handles DuplicateKeyError)
+                if "message_id" in m and "_id" not in m:
+                    m["_id"] = m["message_id"]
                 m["is_demo"] = True
             try:
                 result = await db.messages.insert_many(msgs, ordered=False)
                 _progress["messages_loaded"] += len(result.inserted_ids)
             except Exception as exc:
-                # BulkWriteError fires on duplicates but partial inserts still happen
                 inserted = getattr(getattr(exc, "details", None), "get", lambda k, d: d)(
-                    "nInserted", len(msgs)
+                    "nInserted", 0
                 )
                 _progress["messages_loaded"] += inserted
+
+        # ── Direct messages ──
+        _progress["step"] = "Generating demo direct messages"
+        await _seed_demo_dms(db, users)
 
         # ── Embeddings ──
         _progress["step"] = "Generating embeddings (this takes a few minutes)"
@@ -244,6 +251,73 @@ async def _run_seed(requester_user_id: str):
         _progress["status"] = "error"
         _progress["error"] = str(exc)
         logger.error("demo_seed_failed", error=str(exc))
+
+
+async def _seed_demo_dms(db, users):
+    """Generate realistic DM conversations between random user pairs."""
+    import random
+    from uuid import uuid4
+    from datetime import timezone, timedelta
+
+    _DM_THREADS = [
+        [("Can you review my PR when you get a chance?", 0), ("Sure! Sending you feedback shortly.", 1), ("Thanks, I've addressed your comments.", 0), ("Looks great — approved!", 1)],
+        [("Are you joining the standup today?", 0), ("Yes, dialing in now.", 1), ("Great, see you there!", 0)],
+        [("Did you see the Q2 report Priya shared?", 0), ("Just going through it now.", 1), ("Strong APAC numbers. EMEA needs attention.", 0), ("Agreed. Let's flag it in Friday's review.", 1)],
+        [("Can we shift our 3 pm to 4 pm?", 0), ("No problem, 4 pm works for me.", 1), ("Thanks! Updating the invite now.", 0)],
+        [("The client call went really well!", 0), ("Excellent! Did they sign?", 1), ("Not yet but very positive signals.", 0), ("Keep me posted.", 1)],
+        [("I've updated the shared doc with the new requirements.", 0), ("Saw it — looks comprehensive.", 1), ("Let me know if anything's missing.", 0), ("Will do. Starting the estimate now.", 1)],
+        [("Are you free for a quick sync tomorrow morning?", 0), ("Sure, 9 am?", 1), ("Perfect, sending invite.", 0)],
+        [("Deployment done.", 0), ("Smooth rollout?", 1), ("Yes, all green. Monitoring now.", 0), ("Great work!", 1)],
+        [("Happy Friday! Have a great weekend.", 0), ("You too! Big plans?", 1), ("Quiet one. See you Monday.", 0)],
+        [("Quick question — deadline for the presentation?", 0), ("End of day Thursday.", 1), ("Got it, thanks!", 0)],
+        [("The new feature is live.", 0), ("Already? That was fast.", 1), ("Small change, big impact hopefully.", 0), ("Let me test it now.", 1)],
+        [("Heads up: the staging server is down.", 0), ("On it, checking now.", 1), ("Looks like a config issue.", 0), ("Fixed. Good to go.", 1)],
+    ]
+
+    user_ids = [u["user_id"] for u in users if u.get("user_id")]
+    if len(user_ids) < 2:
+        return
+
+    now = datetime.now(timezone.utc)
+    messages = []
+    pairs_used: set = set()
+
+    for thread in _DM_THREADS:
+        for _ in range(10):
+            u1, u2 = random.sample(user_ids, 2)
+            key = tuple(sorted([u1, u2]))
+            if key not in pairs_used:
+                pairs_used.add(key)
+                break
+        else:
+            continue
+
+        pair = [u1, u2]
+        base = now - timedelta(days=random.randint(1, 14), hours=random.randint(0, 10))
+
+        for offset, (content, sender_idx) in enumerate(thread):
+            mid = str(uuid4())
+            messages.append({
+                "_id": mid,
+                "message_id": mid,
+                "sender_id": pair[sender_idx],
+                "receiver_id": pair[1 - sender_idx],
+                "group_id": None,
+                "content": content,
+                "media_type": "text",
+                "timestamp": base + timedelta(minutes=offset * random.randint(3, 12)),
+                "delivery_status": "delivered",
+                "language": "en",
+                "is_demo": True,
+                "deleted": False,
+                "read": True,
+            })
+
+    if messages:
+        try:
+            await db.messages.insert_many(messages, ordered=False)
+        except Exception:
+            pass
 
 
 async def _generate_demo_embeddings(pool, db):
