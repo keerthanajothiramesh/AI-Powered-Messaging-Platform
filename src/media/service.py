@@ -79,11 +79,14 @@ async def _try_s3_upload(data: bytes, key: str, content_type: str) -> Optional[s
                 Key=key,
                 Body=data,
                 ContentType=content_type,
+                ACL="public-read",
             ),
         )
-        return f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{key}"
+        url = f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{key}"
+        logger.info("s3_upload_ok", key=key, url=url)
+        return url
     except Exception as e:
-        logger.warning("s3_upload_failed", error=str(e))
+        logger.warning("s3_upload_failed", error=str(e), bucket=settings.AWS_S3_BUCKET, key=key)
         return None
 
 
