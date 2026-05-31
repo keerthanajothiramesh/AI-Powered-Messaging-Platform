@@ -50,7 +50,7 @@ async def get_user(user_id: str, current_user=Depends(get_current_user)):
     pool = get_pg_pool()
     async with pool.acquire() as conn:
         user = await conn.fetchrow(
-            "SELECT user_id, display_name, user_presence, last_seen, avatar_url, status FROM users WHERE user_id=$1",
+            "SELECT user_id, display_name, user_presence, last_seen, avatar_url, status, email FROM users WHERE user_id=$1",
             user_id,
         )
         if not user:
@@ -58,6 +58,7 @@ async def get_user(user_id: str, current_user=Depends(get_current_user)):
     return {
         "user_id": str(user["user_id"]),
         "display_name": user["display_name"],
+        "email": user["email"],
         "user_presence": user["user_presence"],
         "last_seen": user["last_seen"].isoformat() if user["last_seen"] else None,
         "avatar_url": user["avatar_url"],
