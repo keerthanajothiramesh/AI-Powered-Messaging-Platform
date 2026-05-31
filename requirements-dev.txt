@@ -1,0 +1,18 @@
+# Install production deps first
+-r requirements.txt
+
+# Dataset generation (run once during setup, not needed at runtime)
+faker==33.1.0
+pandas==2.2.3
+numpy==1.26.4
+
+# Testing
+pytest==8.3.4
+pytest-asyncio==0.24.0
+
+# Load testing
+locust==2.32.4
+
+# Evaluation framework — pulls in PyTorch via sentence-transformers (~2 GB)
+# NEVER add this to requirements.txt; free-tier builds will OOM
+deepeval>=1.4.0
