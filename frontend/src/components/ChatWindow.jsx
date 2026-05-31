@@ -208,7 +208,7 @@ export default function ChatWindow() {
             <button onClick={() => fileRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
               <Paperclip size={20} />
             </button>
-            <input ref={fileRef} type="file" accept="image/*,video/*,audio/*" className="hidden" onChange={handleFileUpload} />
+            <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileUpload} />
             <button onClick={startRecording} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Record voice message">
               <Mic size={20} />
             </button>
@@ -245,6 +245,7 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete }) {
   const isDeleted = msg.deleted
   const isVoice = msg.media_type === 'voice'
   const isImage = msg.media_type === 'image'
+  const isVideo = msg.media_type === 'video'
   const isMedia = msg.media_type !== 'text'
   const ts = msg.timestamp ? format(new Date(msg.timestamp), 'HH:mm') : ''
   const reactions = Object.entries(msg.reactions || {})
@@ -310,26 +311,49 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete }) {
                 <button onClick={handleEditSubmit} className="px-2 py-0.5 rounded bg-white/30 hover:bg-white/40 font-medium">Save</button>
               </div>
             </div>
-          ) : isVoice && !isDeleted ? (
+          ) : isDeleted ? (
+            <p className="italic opacity-60">{msg.content}</p>
+          ) : isVoice ? (
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 text-xs opacity-80 mb-1">
                 <Mic size={13} /> Voice message
               </div>
-              {msg.media_url ? (
-                <audio controls src={resolveMediaUrl(msg.media_url)} className="max-w-full" style={{ height: '36px', minWidth: '220px' }} />
-              ) : (
-                <span className="text-xs opacity-70">Audio unavailable</span>
-              )}
+              {msg.media_url
+                ? <audio controls src={resolveMediaUrl(msg.media_url)} style={{ height: '36px', minWidth: '220px' }} />
+                : <span className="text-xs opacity-70">Audio unavailable</span>
+              }
             </div>
-          ) : isImage && !isDeleted ? (
-            <div className="flex items-center gap-2">
-              <Image size={16} />
-              <span className="text-xs opacity-80">[image] {msg.content}</span>
+          ) : isImage ? (
+            <div className="flex flex-col gap-1">
+              {msg.media_url
+                ? (
+                  <img
+                    src={resolveMediaUrl(msg.media_url)}
+                    alt="image"
+                    className="rounded-lg max-w-xs max-h-56 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => window.open(resolveMediaUrl(msg.media_url), '_blank')}
+                    onError={(e) => { e.target.style.display = 'none' }}
+                  />
+                )
+                : <div className="flex items-center gap-2 text-xs opacity-80"><Image size={14} /> Image unavailable</div>
+              }
+            </div>
+          ) : isVideo ? (
+            <div className="flex flex-col gap-1">
+              {msg.media_url
+                ? (
+                  <video
+                    controls
+                    src={resolveMediaUrl(msg.media_url)}
+                    className="rounded-lg max-w-xs max-h-56"
+                    preload="metadata"
+                  />
+                )
+                : <span className="text-xs opacity-70">Video unavailable</span>
+              }
             </div>
           ) : (
-            <p className={`whitespace-pre-wrap break-words ${isDeleted ? 'italic' : ''}`}>
-              {msg.content}
-            </p>
+            <p className="whitespace-pre-wrap break-words">{msg.content}</p>
           )}
         </div>
 
