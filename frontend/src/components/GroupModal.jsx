@@ -269,8 +269,21 @@ export default function GroupModal({ onClose }) {
                                 <td className="px-3 py-2 text-slate-500 truncate max-w-[120px]">{row.email}</td>
                                 <td className="px-3 py-2 text-center">
                                   {row.found ? (
-                                    row.added || isSelected({ user_id: row.user_id }) ? (
-                                      <span className="inline-flex items-center gap-0.5 text-emerald-600 font-semibold"><Check size={11} /> Added</span>
+                                    isSelected({ user_id: row.user_id }) ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          toggleMember({ user_id: row.user_id, display_name: row.display_name })
+                                          setImportRows((prev) => prev.map((r, idx) => idx === i ? { ...r, added: false } : r))
+                                        }}
+                                        className="inline-flex items-center gap-0.5 text-emerald-600 font-semibold hover:text-red-500 transition-colors group"
+                                        title="Click to remove"
+                                      >
+                                        <Check size={11} className="group-hover:hidden" />
+                                        <X size={11} className="hidden group-hover:inline" />
+                                        <span className="group-hover:hidden">Added</span>
+                                        <span className="hidden group-hover:inline">Remove</span>
+                                      </button>
                                     ) : (
                                       <button
                                         type="button"
