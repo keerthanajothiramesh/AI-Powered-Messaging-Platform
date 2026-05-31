@@ -23,7 +23,7 @@ def embed_batch(genai, texts: list[str]) -> list[list[float]]:
     for text in texts:
         try:
             r = genai.embed_content(
-                model="models/text-embedding-004",
+                model="models/embedding-001",
                 content=text,
                 task_type="retrieval_document",
             )

@@ -14,12 +14,12 @@ class EmbeddingService:
         import google.generativeai as genai
         genai.configure(api_key=api_key)
         self._genai = genai
-        logger.info("embedding_service_initialized", backend="gemini_text-embedding-004")
+        logger.info("embedding_service_initialized", backend="gemini_embedding-001")
 
     def generate_embedding(self, text: str) -> List[float]:
         try:
             result = self._genai.embed_content(
-                model="models/text-embedding-004",
+                model="models/embedding-001",
                 content=text,
                 task_type="retrieval_document",
             )
@@ -31,7 +31,7 @@ class EmbeddingService:
     def generate_query_embedding(self, text: str) -> List[float]:
         try:
             result = self._genai.embed_content(
-                model="models/text-embedding-004",
+                model="models/embedding-001",
                 content=text,
                 task_type="retrieval_query",
             )
