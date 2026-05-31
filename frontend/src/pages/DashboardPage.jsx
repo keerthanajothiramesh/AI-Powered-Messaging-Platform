@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { MessageSquare, LogOut } from 'lucide-react'
+import { MessageSquare, LogOut, BarChart2 } from 'lucide-react'
 import { useAuthStore } from '../store/authStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import ConversationList from '../components/ConversationList'
@@ -12,6 +12,7 @@ import SettingsModal from '../components/SettingsModal'
 import UserInfoModal from '../components/UserInfoModal'
 import SharedMediaModal from '../components/SharedMediaModal'
 import CatchUpBanner, { CatchUpLoader } from '../components/CatchUpBanner'
+import ObservabilityDashboard from '../components/ObservabilityDashboard'
 import client from '../api/client'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
@@ -25,6 +26,7 @@ export default function DashboardPage() {
   const [showSearch, setShowSearch] = useState(false)
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [showObservability, setShowObservability] = useState(false)
 
   // Controls which tab is shown in the RightPanel for groups (members | summary | ai)
   const [rightTab, setRightTab] = useState(null)
@@ -92,6 +94,13 @@ export default function DashboardPage() {
             <p className="text-xs text-emerald-500 font-medium">● online</p>
           </div>
           <button
+            onClick={() => setShowObservability(true)}
+            className="p-1.5 text-slate-400 hover:text-indigo-600 rounded-lg hover:bg-indigo-50 transition-all"
+            title="Observability dashboard"
+          >
+            <BarChart2 size={16} />
+          </button>
+          <button
             onClick={handleLogout}
             className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"
           >
@@ -135,6 +144,7 @@ export default function DashboardPage() {
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
       {showGroupModal && <GroupModal onClose={() => setShowGroupModal(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onSignOut={handleLogout} />}
+      {showObservability && <ObservabilityDashboard onClose={() => setShowObservability(false)} />}
 
       {infoUserId && (
         <UserInfoModal

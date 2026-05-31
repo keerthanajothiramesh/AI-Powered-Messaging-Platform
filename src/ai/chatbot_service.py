@@ -211,11 +211,34 @@ class ChatbotSession:
 
         self.history.append({"role": "model", "content": final_text})
 
+        # Async judge on tool-enriched responses (fire-and-forget, never blocks the reply)
+        if tool_results and final_text:
+            import asyncio
+            asyncio.create_task(self._judge_and_persist(message, final_text))
+
         return {
             "text": final_text or "I couldn't find relevant information. Please try rephrasing your query. 🔍",
             "tool_calls": tool_results,
             "history_length": len(self.history),
         }
+
+    async def _judge_and_persist(self, user_message: str, ai_response: str) -> None:
+        try:
+            from src.agents.judge_agent import JudgeAgent
+            from src.agents.feedback_store import save_response_feedback
+            judgment = await JudgeAgent().evaluate(
+                ai_response,
+                {"group_name": self.conv_name or "chat", "days": 0},
+            )
+            await save_response_feedback(
+                user_id=self.user_id,
+                conv_id=self.conv_id or "default",
+                user_message=user_message,
+                ai_response=ai_response,
+                judgment=judgment,
+            )
+        except Exception as e:
+            logger.warning("chatbot_judge_failed", error=str(e))
 
     async def _execute_tool(self, tool_name: str, args: Dict) -> Any:
         try:

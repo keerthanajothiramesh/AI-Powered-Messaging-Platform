@@ -106,6 +106,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from src.common.metrics import PrometheusMiddleware
+app.add_middleware(PrometheusMiddleware)
+
 app.add_exception_handler(AppError, app_error_handler)
 app.add_exception_handler(StarletteHTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
@@ -150,3 +153,19 @@ async def root():
         "docs": "/docs",
         "health": "/health",
     }
+
+
+@app.get("/metrics")
+async def prometheus_metrics():
+    """Prometheus-format metrics endpoint for scraping."""
+    from src.common.metrics import get_metrics_response
+    return get_metrics_response()
+
+
+@app.get("/metrics/summary")
+async def metrics_summary(_=__import__("fastapi").Depends(
+    __import__("src.auth.dependencies", fromlist=["get_current_user"]).get_current_user
+)):
+    """JSON metrics summary consumed by the React observability dashboard."""
+    from src.common.metrics import get_metrics_summary
+    return await get_metrics_summary()

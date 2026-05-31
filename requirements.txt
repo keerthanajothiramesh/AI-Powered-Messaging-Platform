@@ -72,3 +72,5 @@ sentencepiece>=0.2.0
 pytest==8.3.4
 pytest-asyncio==0.24.0
 locust==2.32.4
+deepeval>=1.4.0
+prometheus-client==0.21.1

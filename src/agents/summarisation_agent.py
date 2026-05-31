@@ -45,6 +45,18 @@ Create clear, structured summaries that:
                 f"Please generate an improved summary for {group_name} addressing these issues."
             )
             summary = await self._generate(refined_prompt, max_tokens=1024)
+            # Re-evaluate refined summary
+            judgment = await JudgeAgent().evaluate(summary, input_data)
+
+        # Persist judge scores to MongoDB for feedback loop
+        from src.agents.feedback_store import save_summary_feedback
+        feedback_id = await save_summary_feedback(
+            group_id=group_id or "",
+            group_name=group_name,
+            days=days,
+            summary=summary,
+            judgment=judgment,
+        )
 
         return {
             "agent":         self.name,
@@ -53,5 +65,6 @@ Create clear, structured summaries that:
             "days":          days,
             "summary":       summary,
             "quality_score": judgment.get("average_score", 0),
+            "feedback_id":   feedback_id,
             "token_stats":   token_stats,
         }

@@ -54,6 +54,24 @@ Provide a concise, structured summary ALWAYS IN ENGLISH (regardless of the origi
 Be factual. Use bullet points. Keep it under 300 words. Output in English only."""
 
 
+# ── Feedback-loop few-shot helper ─────────────────────────────────────────────
+
+async def _get_fewshot_prefix(group_id: str) -> str:
+    """Return a few-shot prefix from the top-rated past summaries for this group."""
+    try:
+        from src.agents.feedback_store import get_top_summaries
+        examples = await get_top_summaries(group_id=group_id, limit=2)
+        if not examples:
+            return ""
+        lines = ["Here are examples of high-quality summaries to guide your style:\n"]
+        for ex in examples:
+            lines.append(f"Example summary (score {ex['average_score']:.1f}/10):\n{ex['summary']}\n")
+        lines.append("---\nNow produce a summary of similar quality for the conversation below.\n\n")
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
 # ── Sender name resolution ────────────────────────────────────────────────────
 
 async def _build_user_map(messages: List[Dict]) -> Dict[str, str]:
@@ -287,15 +305,18 @@ async def summarise_with_stats(
         chunks=len(chunks),
     )
 
+    # Feedback-loop: prepend high-rated examples to guide generation quality
+    fewshot_prefix = await _get_fewshot_prefix(group_id)
+
     if len(chunks) == 1:
-        prompt = f"Summarise this group chat '{group_name}':\n\n{formatted_all}"
+        prompt = f"{fewshot_prefix}Summarise this group chat '{group_name}':\n\n{formatted_all}"
         summary = await generate_text(prompt, system_prompt=SUMMARY_PROMPT, max_tokens=1024)
         strategy = "single-pass"
     else:
         chunk_summaries = await _summarise_chunks_parallel(
             chunks,
             prompt_fn=lambda text: (
-                f"Summarise this portion of the '{group_name}' group chat:\n\n{text}"
+                f"{fewshot_prefix}Summarise this portion of the '{group_name}' group chat:\n\n{text}"
             ),
             system_prompt=SUMMARY_PROMPT,
             user_map=user_map,

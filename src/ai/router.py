@@ -74,6 +74,7 @@ async def summarise(data: SummariseRequest, current_user=Depends(get_current_use
         "days": data.days,
         "summary": result["summary"],
         "quality_score": round(result.get("quality_score", 0), 1),
+        "feedback_id": result.get("feedback_id"),
         "action_items": action_items,
     }
 

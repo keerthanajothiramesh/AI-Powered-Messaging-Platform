@@ -218,4 +218,8 @@ async def create_mongo_indexes(db) -> None:
     await db.notifications.create_index([("created_at", -1)])
     await db.media.create_index([("uploader_id", 1)])
     await db.media.create_index([("group_id", 1)])
+    # Feedback loop — judge scores and user ratings
+    await db.summary_feedback.create_index([("group_id", 1), ("average_score", -1)])
+    await db.summary_feedback.create_index([("created_at", -1)])
+    await db.summary_feedback.create_index([("feedback_id", 1)], unique=True)
     logger.info("mongo_indexes_created")
