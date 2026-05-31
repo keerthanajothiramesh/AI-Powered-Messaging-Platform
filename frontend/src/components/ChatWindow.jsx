@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Paperclip, Image, Mic, CheckCheck, Check, Pencil, Trash2, Square, FileText, MessageCircle, Info, Image as ImageIcon, ImagePlus, FolderOpen, Music } from 'lucide-react'
+import { Send, Paperclip, Image, Mic, CheckCheck, Check, Pencil, Trash2, Square, FileText, MessageCircle, Info, Image as ImageIcon, ImagePlus, FolderOpen, Music, Sparkles, Globe, Loader2 } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -36,6 +36,8 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [showAttachMenu, setShowAttachMenu] = useState(false)
+  const [showImprove, setShowImprove] = useState(false)
+  const [improveLoading, setImproveLoading] = useState(false)
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
   const attachMenuRef = useRef(null)
@@ -199,6 +201,20 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
       await client.delete(`/messages/${messageId}`)
     } catch {
       toast.error('Failed to delete message')
+    }
+  }
+
+  const improveDraft = async (tone) => {
+    if (!input.trim()) return
+    setShowImprove(false)
+    setImproveLoading(true)
+    try {
+      const r = await client.post('/ai/improve-draft', { text: input.trim(), tone })
+      setInput(r.data.improved)
+    } catch {
+      toast.error('Could not improve draft')
+    } finally {
+      setImproveLoading(false)
     }
   }
 
@@ -435,6 +451,7 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value)
+                  setShowImprove(false)
                   const now = Date.now()
                   if (convId && now - lastTypingSentRef.current > 2000) {
                     sendTyping(convId, activeConversation.isGroup)
@@ -448,6 +465,42 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
                 style={{ minHeight: '42px' }}
               />
             </div>
+
+            {/* AI draft improver */}
+            {input.trim() && (
+              <div className="relative flex-shrink-0">
+                <button
+                  onClick={() => setShowImprove((v) => !v)}
+                  disabled={improveLoading}
+                  className={`p-2 rounded-xl transition-all ${showImprove ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50'}`}
+                  title="Improve with AI"
+                >
+                  {improveLoading
+                    ? <Loader2 size={18} className="animate-spin text-indigo-400" />
+                    : <Sparkles size={18} />}
+                </button>
+                {showImprove && (
+                  <div className="absolute bottom-full right-0 mb-2 bg-white rounded-2xl shadow-xl border border-indigo-100 overflow-hidden z-20 w-44">
+                    <p className="px-3 pt-2.5 pb-1 text-xs font-bold text-slate-400 uppercase tracking-wider">Rewrite as…</p>
+                    {[
+                      { key: 'professional', label: '💼 Professional' },
+                      { key: 'friendly',     label: '😊 Friendly' },
+                      { key: 'concise',      label: '⚡ Concise' },
+                      { key: 'formal',       label: '🎩 Formal' },
+                    ].map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => improveDraft(key)}
+                        className="w-full text-left px-3 py-2.5 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 transition-all font-medium"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             <button
               onClick={handleSend}
               disabled={!input.trim()}
@@ -469,6 +522,18 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
   const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(msg.content)
+  const [translated, setTranslated] = useState(null)
+  const [translating, setTranslating] = useState(false)
+
+  const handleTranslate = async () => {
+    if (translated) { setTranslated(null); return }
+    setTranslating(true)
+    try {
+      const r = await client.post('/ai/translate', { text: msg.content, target_language: 'en' })
+      setTranslated(r.data.translated)
+    } catch { /* silent */ }
+    finally { setTranslating(false) }
+  }
 
   const isDeleted = msg.deleted
   const isVoice = msg.media_type === 'voice'
@@ -509,6 +574,16 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
                 {emoji}
               </button>
             ))}
+            {!isMedia && !isDeleted && (
+              <button
+                onClick={handleTranslate}
+                disabled={translating}
+                className={`p-1 rounded-lg transition-all ${translated ? 'text-indigo-500 bg-indigo-50' : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100'}`}
+                title={translated ? 'Hide translation' : 'Translate to English'}
+              >
+                {translating ? <Loader2 size={12} className="animate-spin" /> : <Globe size={12} />}
+              </button>
+            )}
             {isOwn && !editing && (
               <>
                 {!isMedia && (
@@ -614,6 +689,13 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
             <p className="whitespace-pre-wrap break-words leading-relaxed">{msg.content}</p>
           )}
         </div>
+
+        {translated && (
+          <div className="mt-1 px-3 py-2 bg-indigo-50 border border-indigo-100 rounded-xl text-xs text-indigo-700 max-w-xs lg:max-w-md">
+            <span className="flex items-center gap-1 font-semibold text-indigo-400 mb-0.5"><Globe size={10} /> Translated</span>
+            {translated}
+          </div>
+        )}
 
         {msg.edited && !isDeleted && (
           <span className="text-xs text-slate-400 italic">edited</span>

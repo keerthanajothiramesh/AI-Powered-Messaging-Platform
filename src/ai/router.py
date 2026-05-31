@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 from datetime import datetime, timezone, timedelta
 
 from src.auth.dependencies import get_current_user
@@ -115,3 +115,65 @@ async def reset_chat_session(current_user=Depends(get_current_user)):
 async def delete_chat_session(session_id: str, current_user=Depends(get_current_user)):
     clear_session(current_user.user_id, session_id)
     return {"message": "Session cleared"}
+
+
+# ── Inline translation ────────────────────────────────────────────────────────
+
+class TranslateRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000)
+    target_language: str = Field(default="en", max_length=10)
+
+
+_LANG_NAMES: Dict[str, str] = {
+    "en": "English", "ja": "Japanese", "es": "Spanish",
+    "fr": "French", "de": "German", "hi": "Hindi",
+    "zh": "Simplified Chinese", "ar": "Arabic", "pt": "Portuguese",
+    "ko": "Korean", "ru": "Russian",
+}
+
+
+@router.post("/translate")
+async def translate_message(data: TranslateRequest, current_user=Depends(get_current_user)):
+    from src.ai.gemini_client import generate_text
+    target_name = _LANG_NAMES.get(data.target_language, data.target_language)
+    prompt = (
+        f"Translate the following message to {target_name}. "
+        "Return ONLY the translated text — no explanation, no quotes, no prefix.\n\n"
+        f"{data.text}"
+    )
+    try:
+        translated = await generate_text(prompt, temperature=0.2, max_tokens=500)
+        return {"translated": translated.strip(), "target_language": data.target_language}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Translation failed")
+
+
+# ── AI draft tone improver ────────────────────────────────────────────────────
+
+class ImproveRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=2000)
+    tone: str = Field(default="professional")
+
+
+_TONE_INSTRUCTIONS: Dict[str, str] = {
+    "professional": "Rewrite to be professional, clear, and business-appropriate. Remove slang.",
+    "friendly":     "Rewrite to be warm, friendly, and approachable. Keep it conversational.",
+    "concise":      "Rewrite to be as short and direct as possible. Cut filler words.",
+    "formal":       "Rewrite to be formal and polished, suitable for senior stakeholders.",
+}
+
+
+@router.post("/improve-draft")
+async def improve_draft(data: ImproveRequest, current_user=Depends(get_current_user)):
+    from src.ai.gemini_client import generate_text
+    instruction = _TONE_INSTRUCTIONS.get(data.tone, _TONE_INSTRUCTIONS["professional"])
+    prompt = (
+        f"{instruction} "
+        "Return ONLY the rewritten message — no explanation, no quotes.\n\n"
+        f"Original: {data.text}"
+    )
+    try:
+        improved = await generate_text(prompt, temperature=0.4, max_tokens=500)
+        return {"improved": improved.strip(), "tone": data.tone}
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to improve draft")
