@@ -16,7 +16,7 @@ function formatLastSeen(ts) {
 
 export default function ConversationList({ onCreateGroup }) {
   const { t } = useTranslation()
-  const { groups, setGroups, setActiveConversation, activeConversation, onlineUsers, lastSeen } = useChatStore()
+  const { groups, setGroups, setActiveConversation, activeConversation, onlineUsers, lastSeen, unreadCounts, clearUnread } = useChatStore()
   const { user } = useAuthStore()
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -89,7 +89,8 @@ export default function ConversationList({ onCreateGroup }) {
                 subtitle={`${g.member_count} members`}
                 isGroup
                 isActive={activeConversation?.id === g.group_id}
-                onClick={() => setActiveConversation({ id: g.group_id, name: g.group_name, isGroup: true })}
+                unreadCount={unreadCounts[g.group_id] || 0}
+                onClick={() => { setActiveConversation({ id: g.group_id, name: g.group_name, isGroup: true }); clearUnread(g.group_id) }}
               />
             ))}
           </>
@@ -108,7 +109,8 @@ export default function ConversationList({ onCreateGroup }) {
                       subtitle={isOnline ? 'Online' : formatLastSeen(lastSeen[u.user_id] || u.last_seen)}
                       isActive={activeConversation?.id === u.user_id}
                       isOnline={isOnline}
-                      onClick={() => setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false })}
+                      unreadCount={unreadCounts[u.user_id] || 0}
+                      onClick={() => { setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false }); clearUnread(u.user_id) }}
                     />
                   )
                 })
@@ -123,7 +125,8 @@ export default function ConversationList({ onCreateGroup }) {
                         subtitle={u.last_message || (isOnline ? 'Online' : formatLastSeen(lastSeen[u.user_id] || u.last_seen))}
                         isActive={activeConversation?.id === u.user_id}
                         isOnline={isOnline}
-                        onClick={() => setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false })}
+                        unreadCount={unreadCounts[u.user_id] || 0}
+                        onClick={() => { setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false }); clearUnread(u.user_id) }}
                       />
                     )
                   })
@@ -140,7 +143,7 @@ export default function ConversationList({ onCreateGroup }) {
   )
 }
 
-function ConvItem({ id, name, subtitle, isGroup, isActive, isOnline, onClick }) {
+function ConvItem({ id, name, subtitle, isGroup, isActive, isOnline, unreadCount, onClick }) {
   const initials = name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
   return (
     <button
@@ -159,6 +162,11 @@ function ConvItem({ id, name, subtitle, isGroup, isActive, isOnline, onClick }) 
         <p className="text-sm font-medium text-gray-900 truncate">{name}</p>
         <p className={`text-xs truncate ${isOnline ? 'text-green-500 font-medium' : 'text-gray-400'}`}>{subtitle}</p>
       </div>
+      {unreadCount > 0 && (
+        <span className="flex-shrink-0 min-w-[20px] h-5 bg-primary rounded-full text-xs text-white flex items-center justify-center font-semibold px-1">
+          {unreadCount > 99 ? '99+' : unreadCount}
+        </span>
+      )}
     </button>
   )
 }

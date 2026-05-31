@@ -27,9 +27,9 @@ function formatPresence(isOnline, lastSeenTs) {
 
 export default function ChatWindow() {
   const { t } = useTranslation()
-  const { activeConversation, messages, setMessages, onlineUsers, lastSeen } = useChatStore()
+  const { activeConversation, messages, setMessages, onlineUsers, lastSeen, typingUsers, setReaction } = useChatStore()
   const { user } = useAuthStore()
-  const { sendMessage } = useWebSocket()
+  const { sendMessage, sendTyping } = useWebSocket()
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [recording, setRecording] = useState(false)
@@ -39,6 +39,7 @@ export default function ChatWindow() {
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const timerRef = useRef(null)
+  const lastTypingSentRef = useRef(0)
 
   const convId = activeConversation?.id
   const convMessages = messages[convId] || []
@@ -72,6 +73,21 @@ export default function ChatWindow() {
       mediaRecorderRef.current?.stream?.getTracks().forEach((t) => t.stop())
     }
   }, [])
+
+  const handleReact = async (messageId, emoji) => {
+    try {
+      await client.post(`/messages/${messageId}/react?emoji=${encodeURIComponent(emoji)}`)
+      const msg = (messages[convId] || []).find((m) => m.message_id === messageId)
+      if (msg) {
+        const updated = { ...msg.reactions }
+        if (!updated[emoji]) updated[emoji] = []
+        if (!updated[emoji].includes(user?.user_id)) {
+          updated[emoji] = [...updated[emoji], user.user_id]
+        }
+        setReaction(convId, messageId, updated)
+      }
+    } catch { /* silent */ }
+  }
 
   const handleSend = () => {
     const text = input.trim()
@@ -215,10 +231,22 @@ export default function ChatWindow() {
             isOwn={msg.sender_id === user?.user_id}
             onEdit={handleEdit}
             onDelete={handleDelete}
+            onReact={handleReact}
           />
         ))}
         <div ref={bottomRef} />
       </div>
+
+      {typingUsers[convId] && (
+        <div className="px-6 pb-1 flex items-center gap-2 text-xs text-gray-400">
+          <span className="flex gap-0.5 items-center">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+          </span>
+          typing…
+        </div>
+      )}
 
       <div className="px-4 py-3 border-t border-gray-100 bg-white">
         {recording ? (
@@ -247,7 +275,14 @@ export default function ChatWindow() {
             <div className="flex-1 relative">
               <textarea
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  const now = Date.now()
+                  if (convId && now - lastTypingSentRef.current > 2000) {
+                    sendTyping(convId, activeConversation.isGroup)
+                    lastTypingSentRef.current = now
+                  }
+                }}
                 onKeyDown={handleKeyDown}
                 placeholder={t('chat.typeMessage')}
                 rows={1}
@@ -269,7 +304,9 @@ export default function ChatWindow() {
   )
 }
 
-function MessageBubble({ msg, isOwn, onEdit, onDelete }) {
+const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏']
+
+function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
   const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(msg.content)
@@ -302,24 +339,38 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete }) {
       onMouseLeave={() => setHovered(false)}
     >
       <div className={`max-w-xs lg:max-w-md ${isOwn ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
-        {isOwn && !isDeleted && !editing && hovered && (
-          <div className="flex gap-1 justify-end">
-            {!isMedia && (
+        {!isDeleted && hovered && (
+          <div className={`flex gap-0.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+            {QUICK_REACTIONS.map((emoji) => (
               <button
-                onClick={() => { setEditText(msg.content); setEditing(true) }}
-                className="p-1 rounded text-gray-400 hover:text-blue-500 hover:bg-gray-100 transition-colors"
-                title="Edit"
+                key={emoji}
+                onClick={(e) => { e.stopPropagation(); onReact(msg.message_id, emoji) }}
+                className="text-base hover:scale-125 transition-transform leading-none px-0.5"
+                title={emoji}
               >
-                <Pencil size={12} />
+                {emoji}
               </button>
+            ))}
+            {isOwn && !editing && (
+              <>
+                {!isMedia && (
+                  <button
+                    onClick={() => { setEditText(msg.content); setEditing(true) }}
+                    className="ml-1 p-1 rounded text-gray-400 hover:text-blue-500 hover:bg-gray-100 transition-colors"
+                    title="Edit"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                )}
+                <button
+                  onClick={() => onDelete(msg.message_id)}
+                  className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-gray-100 transition-colors"
+                  title="Delete"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </>
             )}
-            <button
-              onClick={() => onDelete(msg.message_id)}
-              className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-gray-100 transition-colors"
-              title="Delete"
-            >
-              <Trash2 size={12} />
-            </button>
           </div>
         )}
 

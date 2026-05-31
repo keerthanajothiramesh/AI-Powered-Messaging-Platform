@@ -7,6 +7,8 @@ export const useChatStore = create((set, get) => ({
   messages: {},
   onlineUsers: new Set(),
   lastSeen: {},
+  typingUsers: {},
+  unreadCounts: {},
 
   setActiveConversation: (conv) => set({ activeConversation: conv }),
   setConversations: (list) => set({ conversations: list }),
@@ -49,6 +51,38 @@ export const useChatStore = create((set, get) => ({
         ...s.messages,
         [convId]: (s.messages[convId] || []).map((m) =>
           m.message_id === messageId ? { ...m, content: '[Message deleted]', deleted: true } : m
+        ),
+      },
+    })),
+
+  setTyping: (convId) =>
+    set((s) => ({ typingUsers: { ...s.typingUsers, [convId]: true } })),
+
+  clearTyping: (convId) =>
+    set((s) => {
+      const next = { ...s.typingUsers }
+      delete next[convId]
+      return { typingUsers: next }
+    }),
+
+  incrementUnread: (convId) =>
+    set((s) => ({
+      unreadCounts: { ...s.unreadCounts, [convId]: (s.unreadCounts[convId] || 0) + 1 },
+    })),
+
+  clearUnread: (convId) =>
+    set((s) => {
+      const next = { ...s.unreadCounts }
+      delete next[convId]
+      return { unreadCounts: next }
+    }),
+
+  setReaction: (convId, messageId, reactions) =>
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [convId]: (s.messages[convId] || []).map((m) =>
+          m.message_id === messageId ? { ...m, reactions } : m
         ),
       },
     })),

@@ -5,6 +5,8 @@ import toast from 'react-hot-toast'
 
 const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
 
+const typingTimeouts = {}
+
 export function useWebSocket() {
   const ws = useRef(null)
   const reconnectTimeout = useRef(null)
@@ -51,6 +53,14 @@ export function useWebSocket() {
       if (data.queued_count > 0) {
         toast(`📬 ${data.queued_count} message${data.queued_count > 1 ? 's' : ''} delivered from while you were offline`)
       }
+    } else if (type === 'typing') {
+      const convId = data.group_id || data.user_id
+      if (!convId) return
+      useChatStore.getState().setTyping(convId)
+      clearTimeout(typingTimeouts[convId])
+      typingTimeouts[convId] = setTimeout(() => {
+        useChatStore.getState().clearTyping(convId)
+      }, 3000)
     } else if (type === 'message') {
       const currentUserId = useAuthStore.getState().user?.user_id
       const convId = data.group_id
@@ -58,6 +68,7 @@ export function useWebSocket() {
       addMessage(convId, data)
       if (convId !== useChatStore.getState().activeConversation?.id) {
         toast(`New message from ${data.sender_id?.slice(0, 8)}…`, { icon: '💬' })
+        useChatStore.getState().incrementUnread(convId)
       }
     } else if (type === 'group_added') {
       const { groups } = useChatStore.getState()
