@@ -14,9 +14,9 @@ def init_gemini(api_key: str) -> None:
     try:
         import google.generativeai as genai
         genai.configure(api_key=api_key)
-        _model = genai.GenerativeModel("gemini-1.5-flash")
+        _model = genai.GenerativeModel("gemini-2.0-flash")
         _client = genai
-        logger.info("gemini_initialized", model="gemini-1.5-flash")
+        logger.info("gemini_initialized", model="gemini-2.0-flash")
     except Exception as e:
         logger.error("gemini_init_failed", error=str(e))
 
@@ -110,7 +110,7 @@ async def generate_with_tools(
             )
 
         model_with_tools = genai.GenerativeModel(
-            "gemini-1.5-flash",
+            "gemini-2.0-flash",
             tools=tool_defs,
             system_instruction=system_prompt if system_prompt else None,
         )
