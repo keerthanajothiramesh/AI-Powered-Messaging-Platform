@@ -122,6 +122,7 @@ from src.search.router import router as search_router
 from src.media.router import router as media_router
 from src.notifications.router import router as notif_router
 from src.agents.router import router as agents_router
+from src.admin.router import router as admin_router
 
 app.include_router(health_router)
 app.include_router(auth_router)
@@ -134,6 +135,7 @@ app.include_router(search_router)
 app.include_router(media_router)
 app.include_router(notif_router)
 app.include_router(agents_router)
+app.include_router(admin_router)
 
 uploads_path = Path(settings.LOCAL_UPLOADS_PATH)
 uploads_path.mkdir(parents=True, exist_ok=True)
