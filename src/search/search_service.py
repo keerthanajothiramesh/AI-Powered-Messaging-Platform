@@ -1,3 +1,4 @@
+import asyncio
 from typing import List, Dict, Any, Optional
 from src.common.logger import get_logger
 
@@ -9,10 +10,16 @@ async def hybrid_search(
     n_results: int = 10,
     filters: Optional[Dict] = None,
 ) -> List[Dict[str, Any]]:
-    semantic_results = await _semantic_search(query, n_results, filters)
-    bm25_results = await _bm25_search(query, n_results, filters)
+    semantic_results, bm25_results, doc_results = await asyncio.gather(
+        _semantic_search(query, n_results, filters),
+        _bm25_search(query, n_results, filters),
+        _document_search(query, min(4, n_results // 2), filters),
+    )
     fused = _reciprocal_rank_fusion(semantic_results, bm25_results, k=60)
-    return fused[:n_results]
+    # Document chunks supplement messages — append after dedup by ID
+    existing_ids = {r["message_id"] for r in fused}
+    extra_docs = [r for r in doc_results if r["message_id"] not in existing_ids]
+    return (fused + extra_docs)[:n_results]
 
 
 async def _semantic_search(
@@ -106,6 +113,20 @@ def _reciprocal_rank_fusion(
 
     sorted_ids = sorted(scores.keys(), key=lambda x: scores[x], reverse=True)
     return [{**docs[i], "rrf_score": scores[i]} for i in sorted_ids]
+
+
+async def _document_search(
+    query: str, n_results: int, filters: Optional[Dict]
+) -> List[Dict]:
+    try:
+        from src.ai.vector_store import get_vector_store
+        vs = get_vector_store()
+        if not vs:
+            return []
+        return await vs.search_document_chunks(query, n_results=n_results, filters=filters)
+    except Exception as e:
+        logger.error("document_search_failed", error=str(e))
+        return []
 
 
 async def search_media(

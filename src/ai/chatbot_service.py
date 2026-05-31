@@ -50,11 +50,13 @@ You help users:
 1. Find specific messages using semantic search
 2. Summarise conversations and group discussions
 3. Answer questions about chat history
-4. Look up media files and attachments
+4. Answer questions from uploaded documents, PDFs, reports, and shared files
+5. Look up media files and attachments
 
 IMPORTANT RULES:
 - When the user asks to 'summarize', 'summarise', 'give a summary', 'what was discussed', or similar, ALWAYS call the 'summarise_current_conversation' tool immediately. Do NOT ask which conversation or group — you already know the context.
-- For questions about specific messages, always use 'search_messages' first.
+- For questions about specific messages OR documents/files, always use 'search_messages' first.
+- When a result has source='document', mention the filename so the user knows which file you're quoting.
 - Multilingual: always output summaries in English even if source messages are in another language.
 - Use friendly emojis occasionally to make responses more engaging. ✨
 
@@ -83,7 +85,11 @@ CHATBOT_TOOLS = [
     },
     {
         "name": "search_messages",
-        "description": "Search chat history for relevant messages using semantic search",
+        "description": (
+            "Search chat history AND uploaded documents/files for relevant content using semantic search. "
+            "Use this for any question about past messages, shared files, PDFs, reports, or documents. "
+            "Results include both chat messages and document chunks with their source noted."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -225,8 +231,16 @@ class ChatbotSession:
                 filters = {}
                 if args.get("media_type"):
                     filters["media_type"] = args["media_type"]
-                results = await hybrid_search(args["query"], n_results=5, filters=filters)
-                return [{"content": r["content"], "metadata": r.get("metadata", {})} for r in results]
+                results = await hybrid_search(args["query"], n_results=8, filters=filters)
+                return [
+                    {
+                        "content": r["content"],
+                        "source": r.get("source_type", "message"),
+                        "filename": r.get("metadata", {}).get("filename", ""),
+                        "metadata": r.get("metadata", {}),
+                    }
+                    for r in results
+                ]
 
             elif tool_name == "get_conversation_summary":
                 from src.common.database import get_pg_pool

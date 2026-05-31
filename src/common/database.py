@@ -158,6 +158,30 @@ async def create_pg_tables(pool: asyncpg.Pool) -> None:
                 ON message_embeddings USING hnsw (embedding vector_cosine_ops)
                 WITH (m = 16, ef_construction = 64)
             """)
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS document_chunks (
+                    id SERIAL PRIMARY KEY,
+                    media_id TEXT NOT NULL,
+                    chunk_index INT NOT NULL,
+                    content TEXT NOT NULL,
+                    embedding vector(384),
+                    filename TEXT DEFAULT '',
+                    media_type TEXT DEFAULT 'document',
+                    uploader_id TEXT DEFAULT '',
+                    group_id TEXT DEFAULT '',
+                    receiver_id TEXT DEFAULT '',
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    UNIQUE(media_id, chunk_index)
+                )
+            """)
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS doc_chunks_hnsw_idx
+                ON document_chunks USING hnsw (embedding vector_cosine_ops)
+                WITH (m = 16, ef_construction = 64)
+            """)
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS doc_chunks_media_idx ON document_chunks(media_id)
+            """)
         except Exception as e:
             logger.warning("pgvector_table_setup_failed", error=str(e))
         # Migrations: add profile columns idempotently

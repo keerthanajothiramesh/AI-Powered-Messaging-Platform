@@ -48,11 +48,12 @@ async def upload_file(
         vs = get_vector_store()
         if vs:
             embed_text = _extract_text(file_data, content_type, filename) or description or filename
-            vs.add_media(media_id, embed_text, {
+            await vs.add_document_chunks(media_id, embed_text, {
+                "filename": filename,
                 "media_type": media_type,
                 "uploader_id": uploader_id,
                 "group_id": group_id or "",
-                "url": url,
+                "receiver_id": "",
             })
     except Exception as e:
         logger.warning("media_index_failed", error=str(e))
