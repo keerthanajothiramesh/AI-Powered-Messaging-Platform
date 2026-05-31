@@ -4,7 +4,7 @@ from src.common.logger import get_logger
 
 logger = get_logger(__name__)
 
-EMBEDDING_DIM = 768  # text-embedding-004 default dimension
+EMBEDDING_DIM = 3072  # gemini-embedding-001 default dimension
 
 _service: Optional["EmbeddingService"] = None
 
@@ -14,12 +14,12 @@ class EmbeddingService:
         import google.generativeai as genai
         genai.configure(api_key=api_key)
         self._genai = genai
-        logger.info("embedding_service_initialized", backend="gemini_embedding-001")
+        logger.info("embedding_service_initialized", backend="gemini-embedding-001-3072d")
 
     def generate_embedding(self, text: str) -> List[float]:
         try:
             result = self._genai.embed_content(
-                model="models/embedding-001",
+                model="models/gemini-embedding-001",
                 content=text,
                 task_type="retrieval_document",
             )
@@ -31,7 +31,7 @@ class EmbeddingService:
     def generate_query_embedding(self, text: str) -> List[float]:
         try:
             result = self._genai.embed_content(
-                model="models/embedding-001",
+                model="models/gemini-embedding-001",
                 content=text,
                 task_type="retrieval_query",
             )

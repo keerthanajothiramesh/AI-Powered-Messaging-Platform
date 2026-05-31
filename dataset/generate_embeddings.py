@@ -1,4 +1,4 @@
-"""Generate ChromaDB embeddings for all messages using Gemini text-embedding-004."""
+"""Generate ChromaDB embeddings for all messages using Gemini gemini-embedding-001 (3072-dim)."""
 import json
 import time
 from pathlib import Path
@@ -15,7 +15,7 @@ DATA_DIR = Path(__file__).parent
 CHROMA_PATH = os.getenv("CHROMA_DB_PATH", "./chroma_db")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-EMBEDDING_DIM = 768
+EMBEDDING_DIM = 3072
 
 
 def embed_batch(genai, texts: list[str]) -> list[list[float]]:
@@ -23,7 +23,7 @@ def embed_batch(genai, texts: list[str]) -> list[list[float]]:
     for text in texts:
         try:
             r = genai.embed_content(
-                model="models/embedding-001",
+                model="models/gemini-embedding-001",
                 content=text,
                 task_type="retrieval_document",
             )
