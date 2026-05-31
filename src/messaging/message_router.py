@@ -176,6 +176,18 @@ async def get_group_history(
 @router.put("/{message_id}/read")
 async def read_message(message_id: str, current_user=Depends(get_current_user)):
     await mark_message_read(message_id, current_user.user_id)
+
+    # Notify the original sender so their tick turns blue in real-time
+    from src.common.database import get_mongo_db
+    db = get_mongo_db()
+    msg = await db.messages.find_one({"message_id": message_id}, {"sender_id": 1, "_id": 0})
+    if msg and msg.get("sender_id") and msg["sender_id"] != current_user.user_id:
+        manager = get_connection_manager()
+        await manager.send_to_user(msg["sender_id"], {
+            "type": "message_read",
+            "data": {"message_id": message_id},
+        })
+
     return {"status": "ok"}
 
 

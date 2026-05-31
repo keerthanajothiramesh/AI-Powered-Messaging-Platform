@@ -40,7 +40,17 @@ export default function ChatWindow() {
     const url = activeConversation.isGroup
       ? `/messages/group/${convId}/history`
       : `/messages/conversation/${convId}`
-    client.get(url).then((r) => setMessages(convId, r.data)).catch(() => {}).finally(() => setLoading(false))
+    client.get(url)
+      .then((r) => {
+        setMessages(convId, r.data)
+        // Mark all unread incoming messages as read
+        const unread = r.data.filter(
+          (m) => m.sender_id !== user?.user_id && m.delivery_status !== 'read'
+        )
+        unread.forEach((m) => client.put(`/messages/${m.message_id}/read`).catch(() => {}))
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
   }, [convId])
 
   useEffect(() => {
@@ -373,28 +383,36 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete }) {
 
         <div className="flex items-center gap-1 text-xs text-gray-400">
           <span>{ts}</span>
-          {isOwn && !isDeleted && <StatusIcon status={msg.delivery_status} />}
+          {isOwn && !isDeleted && (
+            <StatusIcon
+              status={msg.delivery_status}
+              timestamp={msg.read_at || msg.delivered_at || msg.timestamp}
+            />
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function StatusIcon({ status }) {
+function StatusIcon({ status, timestamp }) {
   const configs = {
-    read:      { icon: <CheckCheck size={14} />, color: 'text-blue-500',  label: 'Read' },
-    delivered: { icon: <CheckCheck size={14} />, color: 'text-gray-400',  label: 'Delivered' },
-    sent:      { icon: <Check size={14} />,      color: 'text-gray-400',  label: 'Sent' },
-    queued:    { icon: <Check size={14} />,      color: 'text-gray-300',  label: 'Queued' },
-    failed:    { icon: <Check size={14} />,      color: 'text-red-400',   label: 'Failed' },
+    read:      { icon: <CheckCheck size={14} />, color: 'text-blue-500', label: 'Read' },
+    delivered: { icon: <CheckCheck size={14} />, color: 'text-gray-400', label: 'Delivered' },
+    sent:      { icon: <Check size={14} />,      color: 'text-gray-400', label: 'Sent' },
+    queued:    { icon: <Check size={14} />,      color: 'text-gray-300', label: 'Queued' },
+    failed:    { icon: <Check size={14} />,      color: 'text-red-400',  label: 'Failed' },
   }
   const cfg = configs[status] || configs.sent
+  const timeLabel = timestamp
+    ? `${cfg.label} · ${format(new Date(timestamp), 'HH:mm')}`
+    : cfg.label
 
   return (
     <span className="relative group/status inline-flex cursor-default">
       <span className={cfg.color}>{cfg.icon}</span>
       <span className="absolute bottom-full right-0 mb-1.5 px-2 py-0.5 text-xs bg-gray-800 text-white rounded whitespace-nowrap opacity-0 group-hover/status:opacity-100 transition-opacity pointer-events-none z-10">
-        {cfg.label}
+        {timeLabel}
       </span>
     </span>
   )
