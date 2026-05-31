@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import List
+from pydantic import BaseModel
 from src.auth.dependencies import get_current_user
 from src.common.database import get_pg_pool
 from src.common.logger import get_logger
@@ -74,6 +76,34 @@ async def update_status(
             status, current_user.user_id,
         )
     return {"status": status}
+
+
+class ResolveEmailsRequest(BaseModel):
+    emails: List[str]
+
+
+@router.post("/resolve-by-email")
+async def resolve_users_by_email(
+    data: ResolveEmailsRequest,
+    current_user=Depends(get_current_user),
+):
+    emails = [e.strip().lower() for e in data.emails if e.strip()][:99]
+    pool = get_pg_pool()
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT user_id, display_name, email FROM users WHERE lower(email) = ANY($1::text[])",
+            emails,
+        )
+    found = {r["email"].lower(): r for r in rows}
+    return [
+        {
+            "email": email,
+            "user_id": str(found[email]["user_id"]) if email in found else None,
+            "display_name": found[email]["display_name"] if email in found else None,
+            "found": email in found,
+        }
+        for email in emails
+    ]
 
 
 def _user_to_dict(user) -> dict:
