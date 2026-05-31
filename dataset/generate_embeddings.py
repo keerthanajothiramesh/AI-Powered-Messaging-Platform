@@ -42,7 +42,7 @@ def run():
 
     import google.generativeai as genai
     genai.configure(api_key=GEMINI_API_KEY)
-    print("Gemini embedding API ready (text-embedding-004, 768-dim)")
+    print("Gemini embedding API ready (gemini-embedding-001, 3072-dim)")
 
     import chromadb
     # Delete stale collection if it exists with wrong dimension
