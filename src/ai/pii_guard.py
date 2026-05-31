@@ -1,11 +1,12 @@
-"""PII detection and anonymization.
+"""PII detection and anonymization using Presidio with a no-op NLP engine.
 
-Uses Presidio when available (requires presidio-analyzer + spaCy en_core_web_sm).
-Falls back to regex patterns when Presidio is not installed or the spaCy model
-has not been downloaded yet.
+Presidio is configured with a lightweight stub NLP engine instead of spaCy,
+so no NLP model is downloaded or loaded at runtime (~0 MB vs ~250 MB for
+en_core_web_sm). Pattern/regex-based recognizers (email, phone, credit card,
+SSN, IP address) work normally. PERSON and LOCATION NER is skipped — those
+entities require an actual spaCy model and are not critical for chat PII.
 
-Render build command to enable full Presidio:
-    pip install -r requirements.txt && python -m spacy download en_core_web_sm
+Falls back to plain regex when presidio-analyzer is not installed.
 """
 import re
 from typing import Tuple, List
@@ -13,22 +14,62 @@ from src.common.logger import get_logger
 
 logger = get_logger(__name__)
 
-# ─── Presidio (optional) ──────────────────────────────────────────────────────
-
 _analyzer = None
 _anonymizer = None
 _presidio_ready = False
 
 
+# ─── Lightweight NLP engine shim ─────────────────────────────────────────────
+
+class _NoOpNlpEngine:
+    """Presidio NLP engine that does nothing — no spaCy model, no memory cost.
+
+    Presidio's pattern-based recognizers (EmailRecognizer, PhoneRecognizer,
+    etc.) run their own regex and do not call process_text at all, so this
+    stub is sufficient to satisfy the AnalyzerEngine interface.
+    """
+
+    supported_languages = ["en"]
+
+    def load(self) -> None:
+        pass
+
+    def is_loaded(self, language: str) -> bool:
+        return True
+
+    def process_text(self, text: str, language: str):
+        from presidio_analyzer.nlp_engine import NlpArtifacts
+        return NlpArtifacts(
+            entities=[],
+            tokens=[],
+            tokens_indices=[],
+            lemmas=[],
+            nlp_engine=self,
+            score_cutoff=0,
+        )
+
+    def process_batch(self, texts, language, **kwargs):
+        for text in texts:
+            yield text, self.process_text(text, language)
+
+
+# ─── Init ─────────────────────────────────────────────────────────────────────
+
 def init_pii_guard() -> bool:
     global _analyzer, _anonymizer, _presidio_ready
     try:
-        from presidio_analyzer import AnalyzerEngine
+        from presidio_analyzer import AnalyzerEngine, RecognizerRegistry
         from presidio_anonymizer import AnonymizerEngine
-        _analyzer = AnalyzerEngine()
+
+        nlp_engine = _NoOpNlpEngine()
+
+        registry = RecognizerRegistry()
+        registry.load_predefined_recognizers(nlp_engine=nlp_engine)
+
+        _analyzer = AnalyzerEngine(nlp_engine=nlp_engine, registry=registry)
         _anonymizer = AnonymizerEngine()
         _presidio_ready = True
-        logger.info("pii_guard_ready", engine="presidio")
+        logger.info("pii_guard_ready", engine="presidio_pattern_only")
     except Exception as e:
         _presidio_ready = False
         logger.info("pii_guard_ready", engine="regex_fallback", reason=str(e)[:80])
@@ -58,16 +99,20 @@ def _regex_scan(text: str) -> Tuple[str, List[str]]:
 
 # ─── Public API ───────────────────────────────────────────────────────────────
 
+# Pattern-only entities — no PERSON/LOCATION since those require spaCy NER
 _ENTITIES = [
-    "EMAIL_ADDRESS", "PHONE_NUMBER", "CREDIT_CARD",
-    "US_SSN", "PERSON", "LOCATION", "IP_ADDRESS",
+    "EMAIL_ADDRESS",
+    "PHONE_NUMBER",
+    "CREDIT_CARD",
+    "US_SSN",
+    "IP_ADDRESS",
 ]
 
 
 def scan_and_anonymize(text: str) -> Tuple[str, List[str]]:
     """Return (anonymized_text, list_of_detected_entity_types).
 
-    If no PII is found the original text is returned unchanged.
+    Uses Presidio pattern recognizers when available, regex otherwise.
     """
     if not text:
         return text, []
@@ -83,6 +128,5 @@ def scan_and_anonymize(text: str) -> Tuple[str, List[str]]:
             return anonymized.text, detected
         except Exception as e:
             logger.warning("presidio_scan_failed", error=str(e))
-            # fall through to regex
 
     return _regex_scan(text)
