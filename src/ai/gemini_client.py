@@ -14,7 +14,7 @@ def init_gemini(api_key: str) -> None:
     try:
         import google.generativeai as genai
         genai.configure(api_key=api_key)
-        _model = genai.GenerativeModel("gemini-1.5-flash")
+        _model = genai.GenerativeModel("gemini-2.5-flash")
         _client = genai
         logger.info("gemini_initialized", model="gemini-1.5-flash")
     except Exception as e:
@@ -108,7 +108,7 @@ async def generate_with_tools(
                 )
             )
 
-        model_with_tools = genai.GenerativeModel("gemini-1.5-flash", tools=tool_defs)
+        model_with_tools = genai.GenerativeModel("gemini-2.5-flash", tools=tool_defs)
         history = []
         if conversation_history:
             for msg in conversation_history:
