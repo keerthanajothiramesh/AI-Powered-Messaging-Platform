@@ -237,7 +237,7 @@ async def _run_seed(requester_user_id: str):
 
         # ── Direct messages ──
         _progress["step"] = "Generating demo direct messages"
-        await _seed_demo_dms(db, users)
+        await _seed_demo_dms(db, users, requester_user_id)
 
         # ── Embeddings ──
         _progress["step"] = "Generating embeddings (this takes a few minutes)"
@@ -253,8 +253,12 @@ async def _run_seed(requester_user_id: str):
         logger.error("demo_seed_failed", error=str(exc))
 
 
-async def _seed_demo_dms(db, users):
-    """Generate realistic DM conversations between random user pairs."""
+async def _seed_demo_dms(db, users, requester_user_id: str = None):
+    """Generate realistic DM conversations between random user pairs.
+
+    The first 6 threads always include the requester so they appear in the
+    logged-in user's Direct tab. The remaining threads are between synthetic users.
+    """
     import random
     from uuid import uuid4
     from datetime import timezone, timedelta
@@ -282,11 +286,20 @@ async def _seed_demo_dms(db, users):
     messages = []
     pairs_used: set = set()
 
-    for thread in _DM_THREADS:
+    # Threads where the requester is always one participant (so they appear in their DM list)
+    REQUESTER_THREAD_COUNT = 6
+
+    for thread_idx, thread in enumerate(_DM_THREADS):
+        force_requester = requester_user_id and thread_idx < REQUESTER_THREAD_COUNT
+
         for _ in range(10):
-            u1, u2 = random.sample(user_ids, 2)
+            if force_requester:
+                other = random.choice(user_ids)
+                u1, u2 = requester_user_id, other
+            else:
+                u1, u2 = random.sample(user_ids, 2)
             key = tuple(sorted([u1, u2]))
-            if key not in pairs_used:
+            if key not in pairs_used and u1 != u2:
                 pairs_used.add(key)
                 break
         else:
