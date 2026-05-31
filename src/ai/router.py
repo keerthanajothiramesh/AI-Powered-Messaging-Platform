@@ -51,8 +51,23 @@ async def summarise(data: SummariseRequest, current_user=Depends(get_current_use
         group = await conn.fetchrow("SELECT group_name FROM groups WHERE group_id=$1", data.group_id)
 
     group_name = group["group_name"] if group else "the group"
-    summary = await summarise_conversation(data.group_id, days=data.days, group_name=group_name)
-    return {"group_id": data.group_id, "group_name": group_name, "days": data.days, "summary": summary}
+
+    # Use SummarisationAgent — runs LLM-as-Judge and regenerates if quality < 7/10
+    from src.agents.summarisation_agent import SummarisationAgent
+    agent = SummarisationAgent()
+    result = await agent.run({
+        "group_id": data.group_id,
+        "group_name": group_name,
+        "days": data.days,
+    })
+
+    return {
+        "group_id": data.group_id,
+        "group_name": group_name,
+        "days": data.days,
+        "summary": result["summary"],
+        "quality_score": round(result.get("quality_score", 0), 1),
+    }
 
 
 @router.post("/catchup")

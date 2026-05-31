@@ -2,6 +2,7 @@ import re
 from typing import List, Dict, Any, Optional
 from src.common.logger import get_logger
 from src.ai.gemini_client import generate_with_tools, generate_text
+from src.ai.pii_guard import scan_and_anonymize
 
 logger = get_logger(__name__)
 
@@ -114,10 +115,15 @@ class ChatbotSession:
         if rejection:
             return {"text": rejection, "tool_calls": [], "history_length": len(self.history)}
 
-        self.history.append({"role": "user", "content": message})
+        # Anonymize PII before sending to LLM
+        safe_message, detected_pii = scan_and_anonymize(message)
+        if detected_pii:
+            logger.info("pii_anonymized", types=detected_pii, user_id=self.user_id)
+
+        self.history.append({"role": "user", "content": safe_message})
 
         response = await generate_with_tools(
-            prompt=message,
+            prompt=safe_message,
             tools=CHATBOT_TOOLS,
             conversation_history=self.history[:-1],
         )

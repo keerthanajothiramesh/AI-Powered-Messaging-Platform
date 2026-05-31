@@ -65,6 +65,12 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("gemini_skipped", reason="GEMINI_API_KEY not set")
 
+    try:
+        from src.ai.pii_guard import init_pii_guard
+        init_pii_guard()
+    except Exception as e:
+        logger.warning("pii_guard_startup_failed", error=str(e))
+
     Path(settings.LOCAL_UPLOADS_PATH).mkdir(parents=True, exist_ok=True)
     logger.info("startup_complete")
 
