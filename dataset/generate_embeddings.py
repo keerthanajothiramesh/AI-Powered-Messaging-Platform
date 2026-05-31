@@ -1,5 +1,6 @@
-"""Generate ChromaDB embeddings for all messages using sentence-transformers (local, no rate limits)."""
+"""Generate pgvector embeddings for all messages using fastembed (local ONNX, no rate limits)."""
 import json
+import asyncio
 import time
 from pathlib import Path
 import sys
@@ -12,37 +13,51 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATA_DIR = Path(__file__).parent
-CHROMA_PATH = os.getenv("CHROMA_DB_PATH", "./chroma_db")
+NEON_DATABASE_URL = os.getenv("NEON_DATABASE_URL", "")
 
-MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_NAME = "BAAI/bge-small-en-v1.5"
 EMBEDDING_DIM = 384
-BATCH_SIZE = 256  # sentence-transformers handles large batches efficiently on CPU
+BATCH_SIZE = 256
 
 
-def run():
-    print(f"Loading local embedding model: {MODEL_NAME} ({EMBEDDING_DIM}-dim)")
-    from sentence_transformers import SentenceTransformer
-    model = SentenceTransformer(MODEL_NAME)
-    print("Model loaded.")
+async def run():
+    if not NEON_DATABASE_URL:
+        print("ERROR: NEON_DATABASE_URL not set in .env")
+        sys.exit(1)
 
-    import chromadb
-    client = chromadb.PersistentClient(path=CHROMA_PATH)
+    print(f"Loading embedding model: {MODEL_NAME} ({EMBEDDING_DIM}-dim, ONNX)")
+    from fastembed import TextEmbedding
+    model = TextEmbedding(MODEL_NAME)
+    print("Model ready.")
 
-    # Reset collection so dimension matches the new model
-    try:
-        client.delete_collection("messages")
-        print("Deleted old 'messages' collection (dimension reset)")
-    except Exception:
-        pass
+    import asyncpg
+    from pgvector.asyncpg import register_vector
 
-    collection = client.get_or_create_collection(
-        "messages", metadata={"hnsw:space": "cosine"}
-    )
-    print("ChromaDB collection ready")
+    clean_url = NEON_DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
+    conn = await asyncpg.connect(clean_url)
+    await register_vector(conn)
+    print("Connected to Neon PostgreSQL.")
+
+    await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS message_embeddings (
+            message_id TEXT PRIMARY KEY,
+            embedding vector(384),
+            content TEXT NOT NULL,
+            sender_id TEXT DEFAULT '',
+            group_id TEXT DEFAULT '',
+            receiver_id TEXT DEFAULT '',
+            media_type TEXT DEFAULT 'text',
+            language TEXT DEFAULT 'en',
+            created_at TIMESTAMPTZ DEFAULT NOW()
+        )
+    """)
+    print("pgvector table ready.")
 
     msg_files = sorted(DATA_DIR.glob("messages_*.json"))
     if not msg_files:
-        print("No messages_*.json files found in dataset/. Run generate_dataset.py first.")
+        print("No messages_*.json files found. Run generate_dataset.py first.")
+        await conn.close()
         sys.exit(1)
 
     total_indexed = 0
@@ -54,56 +69,54 @@ def run():
 
         for i in range(0, len(text_msgs), BATCH_SIZE):
             batch = text_msgs[i:i + BATCH_SIZE]
-            ids = [m["message_id"] for m in batch]
             texts = [m["content"] for m in batch]
-            metadatas = [
-                {
-                    "sender_id": str(m.get("sender_id", "")),
-                    "group_id": str(m.get("group_id", "") or ""),
-                    "receiver_id": str(m.get("receiver_id", "") or ""),
-                    "media_type": m.get("media_type", "text"),
-                    "timestamp": str(m.get("timestamp", "")),
-                    "language": m.get("language", "en"),
-                }
-                for m in batch
+            vecs = list(model.embed(texts))
+
+            records = [
+                (
+                    m["message_id"],
+                    v.tolist(),
+                    m["content"],
+                    str(m.get("sender_id", "")),
+                    str(m.get("group_id", "") or ""),
+                    str(m.get("receiver_id", "") or ""),
+                    m.get("media_type", "text"),
+                    m.get("language", "en"),
+                )
+                for m, v in zip(batch, vecs)
             ]
 
-            try:
-                existing = set(collection.get(ids=ids)["ids"])
-                new_idx = [j for j, id_ in enumerate(ids) if id_ not in existing]
-                if not new_idx:
-                    continue
+            await conn.executemany(
+                """INSERT INTO message_embeddings
+                   (message_id, embedding, content, sender_id, group_id, receiver_id, media_type, language)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                   ON CONFLICT (message_id) DO NOTHING""",
+                records,
+            )
+            total_indexed += len(records)
 
-                new_texts = [texts[j] for j in new_idx]
-                embeddings = model.encode(
-                    new_texts,
-                    batch_size=64,
-                    normalize_embeddings=True,
-                    show_progress_bar=False,
-                ).tolist()
-
-                collection.add(
-                    ids=[ids[j] for j in new_idx],
-                    embeddings=embeddings,
-                    documents=new_texts,
-                    metadatas=[metadatas[j] for j in new_idx],
-                )
-                total_indexed += len(new_idx)
-            except Exception as e:
-                print(f"  Batch error: {e}")
-
-            if total_indexed > 0 and total_indexed % 2000 == 0:
+            if total_indexed % 5000 == 0:
                 elapsed = time.time() - t0
-                rate = total_indexed / elapsed
-                print(f"  Indexed {total_indexed:,} messages ({rate:.0f}/s)...")
+                print(f"  Indexed {total_indexed:,} ({total_indexed / elapsed:.0f} msgs/sec)...")
+
+    # Create HNSW index after data is loaded for optimal performance
+    print("Building HNSW index...")
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS msg_emb_hnsw_idx
+        ON message_embeddings USING hnsw (embedding vector_cosine_ops)
+        WITH (m = 16, ef_construction = 64)
+    """)
+
+    count = await conn.fetchval("SELECT COUNT(*) FROM message_embeddings")
+    await conn.close()
 
     elapsed = time.time() - t0
     print(f"\nEmbeddings complete!")
     print(f"  Total indexed : {total_indexed:,}")
-    print(f"  Collection    : {collection.count():,}")
+    print(f"  DB row count  : {count:,}")
     print(f"  Time          : {elapsed:.1f}s")
     print(f"  Rate          : {total_indexed / max(elapsed, 1):.0f} msgs/sec")
 
 
 if __name__ == "__main__":
-    run()
+    asyncio.run(run())

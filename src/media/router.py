@@ -13,9 +13,22 @@ router = APIRouter(prefix="/media", tags=["media"])
 
 MAX_FILE_SIZE = 50 * 1024 * 1024
 ALLOWED_TYPES = {
+    # Images
     "image/jpeg", "image/png", "image/gif", "image/webp",
+    # Video
     "video/mp4", "video/webm",
+    # Audio
     "audio/mpeg", "audio/wav", "audio/ogg", "audio/webm",
+    # Documents
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "text/plain",
+    "text/csv",
 }
 
 
@@ -41,7 +54,8 @@ async def upload_media(
         group_id=group_id,
         description=description,
     )
-    return {"media_id": record["media_id"], "url": record["url"], "media_type": record["media_type"]}
+    storage = "s3" if record["url"].startswith("http") else "local"
+    return {"media_id": record["media_id"], "url": record["url"], "media_type": record["media_type"], "storage": storage}
 
 
 @router.get("/{media_id}")

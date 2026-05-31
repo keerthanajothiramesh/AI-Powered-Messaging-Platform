@@ -10,6 +10,14 @@ _mongo_client: Optional[motor.motor_asyncio.AsyncIOMotorClient] = None
 _mongo_db = None
 
 
+async def _init_conn(conn) -> None:
+    try:
+        from pgvector.asyncpg import register_vector
+        await register_vector(conn)
+    except Exception:
+        pass  # pgvector not installed or extension not enabled yet
+
+
 async def init_postgres(database_url: str) -> None:
     global _pg_pool
     try:
@@ -19,6 +27,7 @@ async def init_postgres(database_url: str) -> None:
             min_size=5,
             max_size=20,
             command_timeout=60,
+            init=_init_conn,
         )
         logger.info("postgres_connected", pool_min=5, pool_max=20)
     except Exception as e:
@@ -128,6 +137,29 @@ async def create_pg_tables(pool: asyncpg.Pool) -> None:
         await conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_group_members_user ON group_members(user_id);
         """)
+        # pgvector extension + embeddings table
+        try:
+            await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
+            await conn.execute("""
+                CREATE TABLE IF NOT EXISTS message_embeddings (
+                    message_id TEXT PRIMARY KEY,
+                    embedding vector(384),
+                    content TEXT NOT NULL,
+                    sender_id TEXT DEFAULT '',
+                    group_id TEXT DEFAULT '',
+                    receiver_id TEXT DEFAULT '',
+                    media_type TEXT DEFAULT 'text',
+                    language TEXT DEFAULT 'en',
+                    created_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """)
+            await conn.execute("""
+                CREATE INDEX IF NOT EXISTS msg_emb_hnsw_idx
+                ON message_embeddings USING hnsw (embedding vector_cosine_ops)
+                WITH (m = 16, ef_construction = 64)
+            """)
+        except Exception as e:
+            logger.warning("pgvector_table_setup_failed", error=str(e))
         logger.info("postgres_tables_created")
 
 

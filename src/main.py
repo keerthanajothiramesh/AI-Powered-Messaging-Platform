@@ -51,8 +51,8 @@ async def lifespan(app: FastAPI):
 
     try:
         from src.ai.vector_store import init_vector_store
-        Path(settings.CHROMA_DB_PATH).mkdir(parents=True, exist_ok=True)
-        init_vector_store(settings.CHROMA_DB_PATH)
+        from src.common.database import get_pg_pool
+        init_vector_store(get_pg_pool())
     except Exception as e:
         logger.error("vector_store_startup_failed", error=str(e))
 

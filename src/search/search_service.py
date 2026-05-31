@@ -20,19 +20,10 @@ async def _semantic_search(
 ) -> List[Dict]:
     try:
         from src.ai.vector_store import get_vector_store
-        from src.ai.embedding_service import get_embedding_service
-
         vs = get_vector_store()
         if not vs:
             return []
-
-        svc = get_embedding_service()
-        embedding = None
-        if svc:
-            embedding = await svc.generate_embedding_async(query)
-
-        results = vs.search_similar(query, n_results=n_results, filters=filters, query_embedding=embedding)
-        return results
+        return await vs.search_similar(query, n_results=n_results, filters=filters)
     except Exception as e:
         logger.error("semantic_search_failed", error=str(e))
         return []

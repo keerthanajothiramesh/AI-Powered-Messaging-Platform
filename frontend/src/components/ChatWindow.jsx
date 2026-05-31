@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Paperclip, Image, Mic, MicOff, CheckCheck, Check, Eye, Pencil, Trash2, Square } from 'lucide-react'
+import { Send, Paperclip, Image, Mic, MicOff, CheckCheck, Check, Eye, Pencil, Trash2, Square, FileText, FileSpreadsheet, Presentation } from 'lucide-react'
 import { format, isToday, isYesterday } from 'date-fns'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
@@ -122,8 +122,12 @@ export default function ChatWindow() {
     if (activeConversation.isGroup) fd.append('group_id', convId)
     try {
       const r = await client.post('/media/upload', fd)
-      sendMessage(`[Media: ${file.name}]`, convId, activeConversation.isGroup, r.data.media_type, r.data.url)
-      toast.success('File uploaded!')
+      sendMessage(file.name, convId, activeConversation.isGroup, r.data.media_type, r.data.url)
+      if (r.data.storage === 's3') {
+        toast.success('Uploaded to S3')
+      } else {
+        toast.success('File sent')
+      }
     } catch { toast.error('Upload failed') }
     e.target.value = ''
   }
@@ -296,7 +300,7 @@ export default function ChatWindow() {
             <button onClick={() => fileRef.current?.click()} className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
               <Paperclip size={20} />
             </button>
-            <input ref={fileRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleFileUpload} />
+            <input ref={fileRef} type="file" accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv" className="hidden" onChange={handleFileUpload} />
             <button onClick={startRecording} className="p-2 text-gray-400 hover:text-red-500 transition-colors" title="Record voice message">
               <Mic size={20} />
             </button>
@@ -343,6 +347,7 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
   const isVoice = msg.media_type === 'voice'
   const isImage = msg.media_type === 'image'
   const isVideo = msg.media_type === 'video'
+  const isDocument = msg.media_type === 'document' || msg.media_type === 'file'
   const isMedia = msg.media_type !== 'text'
   const ts = msg.timestamp ? format(new Date(msg.timestamp), 'HH:mm') : ''
   const reactions = Object.entries(msg.reactions || {})
@@ -462,6 +467,18 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
                 )
                 : <span className="text-xs opacity-70">Video unavailable</span>
               }
+            </div>
+          ) : isDocument ? (
+            <div
+              className="flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+              style={{ minWidth: '180px' }}
+              onClick={() => msg.media_url && window.open(resolveMediaUrl(msg.media_url), '_blank')}
+            >
+              <FileText size={20} className="flex-shrink-0" />
+              <div className="min-w-0">
+                <p className="text-xs font-medium truncate">{msg.content}</p>
+                <p className="text-xs opacity-60">Click to open</p>
+              </div>
             </div>
           ) : (
             <p className="whitespace-pre-wrap break-words">{msg.content}</p>

@@ -47,7 +47,8 @@ async def upload_file(
         from src.ai.vector_store import get_vector_store
         vs = get_vector_store()
         if vs:
-            vs.add_media(media_id, description or filename, {
+            embed_text = _extract_text(file_data, content_type, filename) or description or filename
+            vs.add_media(media_id, embed_text, {
                 "media_type": media_type,
                 "uploader_id": uploader_id,
                 "group_id": group_id or "",
@@ -106,4 +107,33 @@ def _infer_media_type(content_type: str) -> str:
         return "video"
     if content_type.startswith("audio/"):
         return "voice"
-    return "file"
+    return "document"
+
+
+def _extract_text(data: bytes, content_type: str, filename: str) -> str:
+    try:
+        if content_type == "application/pdf":
+            import fitz
+            doc = fitz.open(stream=data, filetype="pdf")
+            return "\n".join(page.get_text() for page in doc)[:8000]
+        if "word" in content_type or filename.lower().endswith((".docx", ".doc")):
+            from docx import Document
+            from io import BytesIO
+            doc = Document(BytesIO(data))
+            return "\n".join(p.text for p in doc.paragraphs if p.text.strip())[:8000]
+        if "presentation" in content_type or filename.lower().endswith((".pptx", ".ppt")):
+            from pptx import Presentation
+            from io import BytesIO
+            prs = Presentation(BytesIO(data))
+            texts = [
+                shape.text
+                for slide in prs.slides
+                for shape in slide.shapes
+                if hasattr(shape, "text") and shape.text.strip()
+            ]
+            return "\n".join(texts)[:8000]
+        if content_type.startswith("text/"):
+            return data.decode("utf-8", errors="replace")[:8000]
+    except Exception as e:
+        logger.warning("text_extraction_failed", content_type=content_type, error=str(e))
+    return ""
