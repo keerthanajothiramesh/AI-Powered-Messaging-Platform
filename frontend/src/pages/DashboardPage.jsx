@@ -33,17 +33,16 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: '#eef2ff' }}>
-      {/* Left sidebar — dark indigo/violet gradient */}
-      <aside className="w-72 flex flex-col flex-shrink-0"
-             style={{ background: 'linear-gradient(180deg, #1e1b4b 0%, #2d1b69 50%, #2e1065 100%)' }}>
-        <div className="px-4 py-4 border-b border-white/10 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0"
+    <div className="flex h-screen overflow-hidden bg-white">
+      {/* Left sidebar — clean white */}
+      <aside className="w-72 flex flex-col flex-shrink-0 bg-white border-r border-slate-100">
+        <div className="px-4 py-4 border-b border-slate-100 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md flex-shrink-0"
                style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}>
             <MessageSquare size={18} className="text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-bold text-white truncate">{t('app.name')}</p>
+            <p className="text-sm font-bold text-slate-800 truncate">{t('app.name')}</p>
           </div>
         </div>
 
@@ -51,7 +50,7 @@ export default function DashboardPage() {
           <ConversationList onCreateGroup={() => setShowGroupModal(true)} />
         </div>
 
-        <div className="px-4 py-3 border-t border-white/10 flex items-center gap-2.5">
+        <div className="px-4 py-3 border-t border-slate-100 flex items-center gap-2.5">
           <button
             onClick={() => setShowSettings(true)}
             className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-xs font-bold hover:opacity-90 transition-opacity shadow-md flex-shrink-0"
@@ -61,12 +60,12 @@ export default function DashboardPage() {
             {user?.display_name?.slice(0, 2).toUpperCase() || 'U'}
           </button>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-white truncate">{user?.display_name}</p>
-            <p className="text-xs text-emerald-400 font-medium">● online</p>
+            <p className="text-xs font-semibold text-slate-800 truncate">{user?.display_name}</p>
+            <p className="text-xs text-emerald-500 font-medium">● online</p>
           </div>
           <button
             onClick={handleLogout}
-            className="p-1.5 text-white/40 hover:text-white rounded-lg hover:bg-white/10 transition-all"
+            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-all"
           >
             <LogOut size={16} />
           </button>
