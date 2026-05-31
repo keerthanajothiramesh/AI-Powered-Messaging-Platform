@@ -69,6 +69,8 @@ class VectorStore:
         content: str,
         metadata: Dict[str, Any],
     ) -> None:
+        if not content or not content.strip():
+            return
         from src.ai.embedding_service import get_embedding_service
         svc = get_embedding_service()
         embedding = None
