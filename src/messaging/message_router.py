@@ -123,7 +123,7 @@ async def list_dm_conversations(current_user=Depends(get_current_user)):
     user_ids = [c["user_id"] for c in convs]
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT user_id, display_name, user_presence, avatar_url FROM users WHERE user_id = ANY($1::uuid[])",
+            "SELECT user_id, display_name, user_presence, avatar_url, last_seen FROM users WHERE user_id = ANY($1::uuid[])",
             user_ids,
         )
     user_map = {str(r["user_id"]): r for r in rows}
@@ -136,6 +136,7 @@ async def list_dm_conversations(current_user=Depends(get_current_user)):
                 "display_name": u["display_name"],
                 "user_presence": u["user_presence"],
                 "avatar_url": u["avatar_url"],
+                "last_seen": u["last_seen"].isoformat() if u["last_seen"] else None,
                 "last_message": c["last_message"],
                 "last_timestamp": c["last_timestamp"],
             })
@@ -297,4 +298,30 @@ async def react_to_message(
     current_user=Depends(get_current_user),
 ):
     await add_reaction(message_id, current_user.user_id, emoji)
+
+    from src.common.database import get_mongo_db
+    db = get_mongo_db()
+    msg = await db.messages.find_one(
+        {"message_id": message_id},
+        {"sender_id": 1, "receiver_id": 1, "group_id": 1, "_id": 0},
+    )
+    if msg:
+        event = {
+            "type": "message_reaction",
+            "data": {
+                "message_id": message_id,
+                "emoji": emoji,
+                "user_id": current_user.user_id,
+                "sender_id": str(msg.get("sender_id", "")),
+                "receiver_id": str(msg["receiver_id"]) if msg.get("receiver_id") else None,
+                "group_id": str(msg["group_id"]) if msg.get("group_id") else None,
+            },
+        }
+        if msg.get("group_id"):
+            await manager.broadcast_to_group(str(msg["group_id"]), event)
+        else:
+            await manager.send_to_user(str(msg.get("sender_id", "")), event)
+            if msg.get("receiver_id") and str(msg["receiver_id"]) != current_user.user_id:
+                await manager.send_to_user(str(msg["receiver_id"]), event)
+
     return {"status": "ok"}

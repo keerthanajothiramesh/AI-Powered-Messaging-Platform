@@ -27,7 +27,7 @@ async def search_users(
     pool = get_pg_pool()
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            """SELECT user_id, display_name, user_presence, avatar_url
+            """SELECT user_id, display_name, user_presence, avatar_url, last_seen
                FROM users
                WHERE (display_name ILIKE $1 OR email ILIKE $1) AND user_id != $2
                LIMIT 20""",
@@ -39,6 +39,7 @@ async def search_users(
             "display_name": r["display_name"],
             "user_presence": r["user_presence"],
             "avatar_url": r["avatar_url"],
+            "last_seen": r["last_seen"].isoformat() if r["last_seen"] else None,
         }
         for r in rows
     ]

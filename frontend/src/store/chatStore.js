@@ -9,6 +9,7 @@ export const useChatStore = create((set, get) => ({
   lastSeen: {},
   typingUsers: {},
   unreadCounts: {},
+  dmRefreshKey: 0,
 
   setActiveConversation: (conv) => set({ activeConversation: conv }),
   setConversations: (list) => set({ conversations: list }),
@@ -54,6 +55,11 @@ export const useChatStore = create((set, get) => ({
         ),
       },
     })),
+
+  bumpDmRefresh: () => set((s) => ({ dmRefreshKey: s.dmRefreshKey + 1 })),
+
+  setLastSeen: (userId, ts) =>
+    set((s) => ({ lastSeen: { ...s.lastSeen, [userId]: ts } })),
 
   setTyping: (convId) =>
     set((s) => ({ typingUsers: { ...s.typingUsers, [convId]: true } })),

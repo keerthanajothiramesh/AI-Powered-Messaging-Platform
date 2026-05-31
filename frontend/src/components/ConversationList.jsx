@@ -16,7 +16,7 @@ function formatLastSeen(ts) {
 
 export default function ConversationList({ onCreateGroup }) {
   const { t } = useTranslation()
-  const { groups, setGroups, setActiveConversation, activeConversation, onlineUsers, lastSeen, unreadCounts, clearUnread } = useChatStore()
+  const { groups, setGroups, setActiveConversation, activeConversation, onlineUsers, lastSeen, unreadCounts, clearUnread, dmRefreshKey, setLastSeen } = useChatStore()
   const { user } = useAuthStore()
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState([])
@@ -25,8 +25,11 @@ export default function ConversationList({ onCreateGroup }) {
 
   useEffect(() => {
     client.get('/groups/me').then((r) => setGroups(r.data)).catch(() => {})
-    client.get('/messages/dm/conversations').then((r) => setDmConversations(r.data)).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    client.get('/messages/dm/conversations').then((r) => setDmConversations(r.data)).catch(() => {})
+  }, [dmRefreshKey])
 
   const handleSearch = async (q) => {
     setSearch(q)
@@ -110,7 +113,11 @@ export default function ConversationList({ onCreateGroup }) {
                       isActive={activeConversation?.id === u.user_id}
                       isOnline={isOnline}
                       unreadCount={unreadCounts[u.user_id] || 0}
-                      onClick={() => { setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false }); clearUnread(u.user_id) }}
+                      onClick={() => {
+                        setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false })
+                        clearUnread(u.user_id)
+                        if (!isOnline && u.last_seen) setLastSeen(u.user_id, u.last_seen)
+                      }}
                     />
                   )
                 })
@@ -126,7 +133,11 @@ export default function ConversationList({ onCreateGroup }) {
                         isActive={activeConversation?.id === u.user_id}
                         isOnline={isOnline}
                         unreadCount={unreadCounts[u.user_id] || 0}
-                        onClick={() => { setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false }); clearUnread(u.user_id) }}
+                        onClick={() => {
+                          setActiveConversation({ id: u.user_id, name: u.display_name, isGroup: false })
+                          clearUnread(u.user_id)
+                          if (!isOnline && u.last_seen) setLastSeen(u.user_id, u.last_seen)
+                        }}
                       />
                     )
                   })

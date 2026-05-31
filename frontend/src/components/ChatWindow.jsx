@@ -88,16 +88,17 @@ export default function ChatWindow() {
 
   const handleReact = async (messageId, emoji) => {
     try {
-      await client.post(`/messages/${messageId}/react?emoji=${encodeURIComponent(emoji)}`)
-      const msg = (messages[convId] || []).find((m) => m.message_id === messageId)
-      if (msg) {
-        const updated = { ...msg.reactions }
+      // Optimistic update before await to avoid stale closure
+      const currentMsg = (useChatStore.getState().messages[convId] || []).find((m) => m.message_id === messageId)
+      if (currentMsg) {
+        const updated = { ...(currentMsg.reactions || {}) }
         if (!updated[emoji]) updated[emoji] = []
         if (!updated[emoji].includes(user?.user_id)) {
-          updated[emoji] = [...updated[emoji], user.user_id]
+          updated[emoji] = [...updated[emoji], user?.user_id]
         }
         setReaction(convId, messageId, updated)
       }
+      await client.post(`/messages/${messageId}/react?emoji=${encodeURIComponent(emoji)}`)
     } catch { /* silent */ }
   }
 
@@ -251,12 +252,12 @@ export default function ChatWindow() {
       </div>
 
       {suggestions.length > 0 && !input && (
-        <div className="px-4 pb-1 flex gap-2 flex-wrap">
+        <div className="px-4 pb-2 flex gap-2 flex-wrap">
           {suggestions.map((s, i) => (
             <button
               key={i}
               onClick={() => { setInput(s); setSuggestions([]) }}
-              className="px-3 py-1 bg-primary/8 hover:bg-primary/15 text-primary border border-primary/20 rounded-full text-xs transition-colors"
+              className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-primary border border-red-200 rounded-full text-xs font-medium transition-colors shadow-sm"
             >
               {s}
             </button>

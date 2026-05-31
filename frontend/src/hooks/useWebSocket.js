@@ -70,6 +70,25 @@ export function useWebSocket() {
         toast(`New message from ${data.sender_id?.slice(0, 8)}…`, { icon: '💬' })
         useChatStore.getState().incrementUnread(convId)
       }
+      if (!data.group_id) {
+        useChatStore.getState().bumpDmRefresh()
+      }
+    } else if (type === 'message_reaction') {
+      const currentUserId = useAuthStore.getState().user?.user_id
+      const convId = data.group_id
+        || (data.sender_id === currentUserId ? data.receiver_id : data.sender_id)
+      if (convId) {
+        const { messages, setReaction } = useChatStore.getState()
+        const msg = (messages[convId] || []).find((m) => m.message_id === data.message_id)
+        if (msg) {
+          const updated = { ...(msg.reactions || {}) }
+          if (!updated[data.emoji]) updated[data.emoji] = []
+          if (!updated[data.emoji].includes(data.user_id)) {
+            updated[data.emoji] = [...updated[data.emoji], data.user_id]
+          }
+          setReaction(convId, data.message_id, updated)
+        }
+      }
     } else if (type === 'group_added') {
       const { groups } = useChatStore.getState()
       if (!groups.find((g) => g.group_id === data.group_id)) {
