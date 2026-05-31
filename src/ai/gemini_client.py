@@ -145,5 +145,5 @@ async def generate_with_tools(
 
 async def _local_fallback(prompt: str) -> str:
     logger.info("using_local_fallback")
-    words = prompt.split()[:50]
-    return f"[AI Summary] Based on the conversation: {' '.join(words[:20])}... (local fallback active)"
+    from src.ai.local_fallback import generate_local
+    return await generate_local(prompt)
