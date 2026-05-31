@@ -27,20 +27,43 @@ def get_gemini_client():
 
 _circuit_failures = 0
 _circuit_open = False
+_circuit_opened_at: Optional[float] = None
+_CIRCUIT_RESET_SECONDS = 30  # half-open probe after this many seconds
 
 
 def _record_failure():
-    global _circuit_failures, _circuit_open
+    global _circuit_failures, _circuit_open, _circuit_opened_at
     _circuit_failures += 1
     if _circuit_failures >= 3:
-        _circuit_open = True
-        logger.warning("gemini_circuit_open")
+        if not _circuit_open:
+            _circuit_open = True
+            _circuit_opened_at = asyncio.get_event_loop().time()
+            logger.warning("gemini_circuit_open")
 
 
 def _record_success():
-    global _circuit_failures, _circuit_open
+    global _circuit_failures, _circuit_open, _circuit_opened_at
     _circuit_failures = 0
     _circuit_open = False
+    _circuit_opened_at = None
+
+
+def _is_circuit_open() -> bool:
+    """Returns True only if circuit is open AND the reset window hasn't elapsed."""
+    global _circuit_open, _circuit_opened_at, _circuit_failures
+    if not _circuit_open:
+        return False
+    try:
+        elapsed = asyncio.get_event_loop().time() - (_circuit_opened_at or 0)
+    except Exception:
+        elapsed = 0
+    if elapsed >= _CIRCUIT_RESET_SECONDS:
+        # Half-open: allow one probe attempt
+        _circuit_open = False
+        _circuit_failures = 0
+        logger.info("gemini_circuit_half_open", elapsed=round(elapsed))
+        return False
+    return True
 
 
 async def generate_text(
@@ -49,7 +72,7 @@ async def generate_text(
     max_tokens: int = 2048,
     temperature: float = 0.7,
 ) -> str:
-    if _circuit_open:
+    if _is_circuit_open():
         logger.warning("gemini_circuit_open_fallback")
         return await _local_fallback(prompt)
 
@@ -79,7 +102,7 @@ async def generate_with_tools(
     conversation_history: Optional[List[Dict]] = None,
     system_prompt: Optional[str] = None,
 ) -> Dict[str, Any]:
-    if not _model or _circuit_open:
+    if not _model or _is_circuit_open():
         return {"text": await _local_fallback(prompt), "tool_calls": []}
 
     try:

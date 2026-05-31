@@ -117,6 +117,31 @@ async def delete_chat_session(session_id: str, current_user=Depends(get_current_
     return {"message": "Session cleared"}
 
 
+@router.get("/health")
+async def gemini_health(current_user=Depends(get_current_user)):
+    """Test Gemini connectivity. Returns status and circuit breaker state."""
+    from src.ai.gemini_client import generate_text, _circuit_open, _circuit_failures, get_gemini_client
+    model_loaded = get_gemini_client() is not None
+    try:
+        response = await generate_text("Reply with the single word: ok", max_tokens=10)
+        is_fallback = response.startswith("[Local fallback")
+        return {
+            "model_loaded": model_loaded,
+            "circuit_open": _circuit_open,
+            "circuit_failures": _circuit_failures,
+            "gemini_live": not is_fallback,
+            "response_preview": response[:60],
+        }
+    except Exception as e:
+        return {
+            "model_loaded": model_loaded,
+            "circuit_open": _circuit_open,
+            "circuit_failures": _circuit_failures,
+            "gemini_live": False,
+            "error": str(e),
+        }
+
+
 # ── Inline translation ────────────────────────────────────────────────────────
 
 class TranslateRequest(BaseModel):
