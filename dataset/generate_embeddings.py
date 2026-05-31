@@ -18,20 +18,40 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 EMBEDDING_DIM = 3072
 
 
-def embed_batch(genai, texts: list[str]) -> list[list[float]]:
-    results = []
-    for text in texts:
+import re as _re
+
+# Free tier: 100 embed_content requests/minute → 0.6 s minimum gap.
+_MIN_INTERVAL = 0.65
+
+
+def _embed_one(genai, text: str, max_retries: int = 6) -> list[float]:
+    for attempt in range(max_retries):
         try:
             r = genai.embed_content(
                 model="models/gemini-embedding-001",
                 content=text,
                 task_type="retrieval_document",
             )
-            results.append(r["embedding"])
+            return r["embedding"]
         except Exception as e:
-            print(f"  Embedding error: {e}")
-            results.append([0.0] * EMBEDDING_DIM)
-        time.sleep(0.05)  # ~20 req/s to stay within free-tier quota
+            err = str(e)
+            if "429" in err:
+                m = _re.search(r'seconds:\s*(\d+)', err)
+                delay = int(m.group(1)) + 2 if m else min(4 ** attempt, 120)
+                print(f"  Rate limited — sleeping {delay}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(delay)
+            else:
+                print(f"  Embedding error (non-retryable): {e}")
+                return [0.0] * EMBEDDING_DIM
+    print("  Max retries exceeded, using zero vector")
+    return [0.0] * EMBEDDING_DIM
+
+
+def embed_batch(genai, texts: list[str]) -> list[list[float]]:
+    results = []
+    for text in texts:
+        results.append(_embed_one(genai, text))
+        time.sleep(_MIN_INTERVAL)  # stay under 100 req/min free-tier cap
     return results
 
 
