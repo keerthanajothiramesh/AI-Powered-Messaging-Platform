@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel
 from src.auth.dependencies import get_current_user
 from src.common.database import get_pg_pool
@@ -50,7 +50,7 @@ async def get_user(user_id: str, current_user=Depends(get_current_user)):
     pool = get_pg_pool()
     async with pool.acquire() as conn:
         user = await conn.fetchrow(
-            "SELECT user_id, display_name, user_presence, last_seen, avatar_url, status, email FROM users WHERE user_id=$1",
+            "SELECT user_id, display_name, user_presence, last_seen, avatar_url, status, email, job_title, company, department, work_location FROM users WHERE user_id=$1",
             user_id,
         )
         if not user:
@@ -63,6 +63,10 @@ async def get_user(user_id: str, current_user=Depends(get_current_user)):
         "last_seen": user["last_seen"].isoformat() if user["last_seen"] else None,
         "avatar_url": user["avatar_url"],
         "status": user["status"],
+        "job_title": user["job_title"],
+        "company": user["company"],
+        "department": user["department"],
+        "work_location": user["work_location"],
     }
 
 
@@ -78,6 +82,28 @@ async def update_status(
             status, current_user.user_id,
         )
     return {"status": status}
+
+
+class ProfileUpdateRequest(BaseModel):
+    job_title: Optional[str] = None
+    company: Optional[str] = None
+    department: Optional[str] = None
+    work_location: Optional[str] = None
+
+
+@router.put("/me/profile")
+async def update_profile(data: ProfileUpdateRequest, current_user=Depends(get_current_user)):
+    pool = get_pg_pool()
+    updates = {k: v for k, v in data.dict().items() if v is not None}
+    if not updates:
+        return {"message": "Nothing to update"}
+    set_clause = ", ".join(f'"{k}"=${i + 2}' for i, k in enumerate(updates.keys()))
+    async with pool.acquire() as conn:
+        await conn.execute(
+            f"UPDATE users SET {set_clause}, updated_at=NOW() WHERE user_id=$1",
+            current_user.user_id, *updates.values(),
+        )
+    return {"message": "Profile updated"}
 
 
 class ResolveEmailsRequest(BaseModel):

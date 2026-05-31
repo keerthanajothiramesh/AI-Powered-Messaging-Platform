@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Paperclip, Image, Mic, CheckCheck, Check, Pencil, Trash2, Square, FileText, MessageCircle, Info, Image as ImageIcon } from 'lucide-react'
+import { Send, Paperclip, Image, Mic, CheckCheck, Check, Pencil, Trash2, Square, FileText, MessageCircle, Info, Image as ImageIcon, ImagePlus, FolderOpen, Music } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
 import { useWebSocket } from '../hooks/useWebSocket'
@@ -24,7 +24,7 @@ function formatPresence(isOnline, lastSeenTs) {
   return { text: `Last seen ${formatIST(lastSeenTs, 'dd MMM')}`, green: false }
 }
 
-export default function ChatWindow({ onRightTabChange, activeRightTab }) {
+export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpen, onSharedOpen }) {
   const { t } = useTranslation()
   const { activeConversation, messages, setMessages, onlineUsers, lastSeen, typingUsers, setReaction } = useChatStore()
   const { user } = useAuthStore()
@@ -34,8 +34,10 @@ export default function ChatWindow({ onRightTabChange, activeRightTab }) {
   const [recording, setRecording] = useState(false)
   const [suggestions, setSuggestions] = useState([])
   const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const [showAttachMenu, setShowAttachMenu] = useState(false)
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
+  const attachMenuRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
   const timerRef = useRef(null)
@@ -81,6 +83,21 @@ export default function ChatWindow({ onRightTabChange, activeRightTab }) {
       mediaRecorderRef.current?.stream?.getTracks().forEach((t) => t.stop())
     }
   }, [])
+
+  useEffect(() => {
+    if (!showAttachMenu) return
+    const handler = (e) => {
+      if (attachMenuRef.current && !attachMenuRef.current.contains(e.target)) setShowAttachMenu(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showAttachMenu])
+
+  const handleAttachOption = (accept) => {
+    setShowAttachMenu(false)
+    fileRef.current.accept = accept
+    fileRef.current.click()
+  }
 
   const handleReact = async (messageId, emoji) => {
     try {
@@ -201,10 +218,12 @@ export default function ChatWindow({ onRightTabChange, activeRightTab }) {
     )
   }
 
-  // Determine header tab labels based on conversation type
-  const tabs = activeConversation.isGroup
-    ? [{ key: 'members', label: 'Members' }, { key: 'summary', label: 'Summary' }]
-    : [{ key: 'info', label: 'Info' }, { key: 'shared', label: 'Shared' }]
+  // Group header chips control the right panel tab; DM chips open modals
+  const groupTabs = [
+    { key: 'members', label: 'Members' },
+    { key: 'summary', label: 'Summary' },
+    { key: 'ai', label: 'AI' },
+  ]
 
   return (
     <div className="flex-1 flex flex-col bg-white overflow-hidden">
@@ -227,22 +246,39 @@ export default function ChatWindow({ onRightTabChange, activeRightTab }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h2 className="font-bold text-slate-800">{activeConversation.name}</h2>
-            {/* Quick-access tab chips next to the name */}
             <div className="flex gap-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.key}
-                  onClick={() => onRightTabChange?.(activeRightTab === tab.key ? null : tab.key)}
-                  className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border transition-all ${
-                    activeRightTab === tab.key
-                      ? 'text-white border-transparent'
-                      : 'text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600 bg-white'
-                  }`}
-                  style={activeRightTab === tab.key ? { background: 'linear-gradient(135deg, #818cf8, #7c3aed)', border: 'none' } : {}}
-                >
-                  {tab.label}
-                </button>
-              ))}
+              {activeConversation.isGroup
+                ? groupTabs.map((tab) => (
+                    <button
+                      key={tab.key}
+                      onClick={() => onRightTabChange?.(activeRightTab === tab.key ? null : tab.key)}
+                      className={`text-xs px-2.5 py-0.5 rounded-full font-semibold border transition-all ${
+                        activeRightTab === tab.key
+                          ? 'text-white border-transparent'
+                          : 'text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600 bg-white'
+                      }`}
+                      style={activeRightTab === tab.key ? { background: 'linear-gradient(135deg, #818cf8, #7c3aed)', border: 'none' } : {}}
+                    >
+                      {tab.label}
+                    </button>
+                  ))
+                : (
+                  <>
+                    <button
+                      onClick={() => onInfoOpen?.(activeConversation.id)}
+                      className="text-xs px-2.5 py-0.5 rounded-full font-semibold border text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600 bg-white transition-all"
+                    >
+                      Info
+                    </button>
+                    <button
+                      onClick={() => onSharedOpen?.()}
+                      className="text-xs px-2.5 py-0.5 rounded-full font-semibold border text-slate-500 border-slate-200 hover:border-violet-300 hover:text-violet-600 bg-white transition-all"
+                    >
+                      Shared
+                    </button>
+                  </>
+                )
+              }
             </div>
           </div>
           {activeConversation.isGroup ? (
@@ -323,12 +359,48 @@ export default function ChatWindow({ onRightTabChange, activeRightTab }) {
           </div>
         ) : (
           <div className="flex items-end gap-2">
-            <button
-              onClick={() => fileRef.current?.click()}
-              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all flex-shrink-0"
-            >
-              <Paperclip size={20} />
-            </button>
+            {/* Attachment button with dropdown */}
+            <div className="relative flex-shrink-0" ref={attachMenuRef}>
+              <button
+                onClick={() => setShowAttachMenu((p) => !p)}
+                className={`p-2 rounded-xl transition-all ${showAttachMenu ? 'text-indigo-600 bg-indigo-50' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'}`}
+                title="Attach file"
+              >
+                <Paperclip size={20} />
+              </button>
+              {showAttachMenu && (
+                <div className="absolute bottom-full left-0 mb-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-20 w-44">
+                  <p className="px-3 pt-2.5 pb-1 text-xs font-bold text-slate-400 uppercase tracking-wider">Attach</p>
+                  <button
+                    onClick={() => handleAttachOption('image/*,video/*')}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-violet-50 text-left transition-all"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-violet-100 flex items-center justify-center flex-shrink-0">
+                      <ImagePlus size={14} className="text-violet-600" />
+                    </div>
+                    <span className="text-sm text-slate-700 font-medium">Photo & Video</span>
+                  </button>
+                  <button
+                    onClick={() => handleAttachOption('.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.csv')}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-indigo-50 text-left transition-all"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                      <FolderOpen size={14} className="text-indigo-600" />
+                    </div>
+                    <span className="text-sm text-slate-700 font-medium">Document</span>
+                  </button>
+                  <button
+                    onClick={() => handleAttachOption('audio/*')}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 hover:bg-sky-50 text-left transition-all mb-1"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-sky-100 flex items-center justify-center flex-shrink-0">
+                      <Music size={14} className="text-sky-600" />
+                    </div>
+                    <span className="text-sm text-slate-700 font-medium">Audio file</span>
+                  </button>
+                </div>
+              )}
+            </div>
             <input
               ref={fileRef}
               type="file"

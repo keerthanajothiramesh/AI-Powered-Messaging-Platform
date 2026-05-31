@@ -6,24 +6,33 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import ConversationList from '../components/ConversationList'
 import ChatWindow from '../components/ChatWindow'
 import RightPanel from '../components/RightPanel'
-import AIAssistantPanel from '../components/AIAssistantPanel'
 import SearchModal from '../components/SearchModal'
 import GroupModal from '../components/GroupModal'
 import SettingsModal from '../components/SettingsModal'
+import UserInfoModal from '../components/UserInfoModal'
+import SharedMediaModal from '../components/SharedMediaModal'
 import client from '../api/client'
 import toast from 'react-hot-toast'
 import { useNavigate } from 'react-router-dom'
+import { useChatStore } from '../store/chatStore'
 
 export default function DashboardPage() {
   const { t } = useTranslation()
   const { user, logout } = useAuthStore()
   const navigate = useNavigate()
-  const [showAI, setShowAI] = useState(false)
+
   const [showSearch, setShowSearch] = useState(false)
   const [showGroupModal, setShowGroupModal] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  // Controls which tab is shown in the RightPanel (set from ChatWindow header chips)
+
+  // Controls which tab is shown in the RightPanel for groups (members | summary | ai)
   const [rightTab, setRightTab] = useState(null)
+
+  // Info popup and shared media modal
+  const [infoUserId, setInfoUserId] = useState(null)
+  const [showSharedMedia, setShowSharedMedia] = useState(false)
+
+  const { activeConversation, setActiveConversation } = useChatStore()
 
   useWebSocket()
 
@@ -34,13 +43,18 @@ export default function DashboardPage() {
     toast.success('Logged out')
   }
 
+  const handleInfoOpen = (userId) => setInfoUserId(userId)
+  const handleSharedOpen = () => setShowSharedMedia(true)
+
   return (
     <div className="flex h-screen overflow-hidden bg-white">
-      {/* Left sidebar — clean white */}
+      {/* Left sidebar */}
       <aside className="w-72 flex flex-col flex-shrink-0 bg-white border-r border-slate-100">
         <div className="px-4 py-4 border-b border-slate-100 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md flex-shrink-0"
-               style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}>
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center shadow-md flex-shrink-0"
+            style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}
+          >
             <MessageSquare size={18} className="text-white" />
           </div>
           <div className="flex-1 min-w-0">
@@ -74,27 +88,43 @@ export default function DashboardPage() {
         </div>
       </aside>
 
-      {/* Main content */}
+      {/* Chat area */}
       <main className="flex-1 flex overflow-hidden">
-        {showAI
-          ? <AIAssistantPanel onClose={() => setShowAI(false)} />
-          : <ChatWindow onRightTabChange={setRightTab} activeRightTab={rightTab} />
-        }
+        <ChatWindow
+          onRightTabChange={setRightTab}
+          activeRightTab={rightTab}
+          onInfoOpen={handleInfoOpen}
+          onSharedOpen={handleSharedOpen}
+        />
       </main>
 
-      {/* Right panel */}
+      {/* Right panel — always AI-focused */}
       <RightPanel
         onSearchOpen={() => setShowSearch(true)}
-        showAI={showAI}
-        onAIToggle={() => setShowAI((p) => !p)}
         onSettingsOpen={() => setShowSettings(true)}
         activeTab={rightTab}
         onTabChange={setRightTab}
       />
 
+      {/* Modals */}
       {showSearch && <SearchModal onClose={() => setShowSearch(false)} />}
       {showGroupModal && <GroupModal onClose={() => setShowGroupModal(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onSignOut={handleLogout} />}
+
+      {infoUserId && (
+        <UserInfoModal
+          userId={infoUserId}
+          onClose={() => setInfoUserId(null)}
+          onMessage={() => {
+            setActiveConversation({ id: infoUserId, name: '', isGroup: false })
+            setInfoUserId(null)
+          }}
+        />
+      )}
+
+      {showSharedMedia && (
+        <SharedMediaModal onClose={() => setShowSharedMedia(false)} />
+      )}
     </div>
   )
 }

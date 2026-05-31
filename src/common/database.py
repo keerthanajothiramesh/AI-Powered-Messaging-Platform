@@ -160,6 +160,17 @@ async def create_pg_tables(pool: asyncpg.Pool) -> None:
             """)
         except Exception as e:
             logger.warning("pgvector_table_setup_failed", error=str(e))
+        # Migrations: add profile columns idempotently
+        for col, col_def in [
+            ("job_title", "VARCHAR(200)"),
+            ("company", "VARCHAR(200)"),
+            ("department", "VARCHAR(200)"),
+            ("work_location", "VARCHAR(200)"),
+        ]:
+            try:
+                await conn.execute(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {col_def}")
+            except Exception:
+                pass
         logger.info("postgres_tables_created")
 
 
