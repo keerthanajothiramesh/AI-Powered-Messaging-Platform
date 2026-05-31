@@ -177,3 +177,110 @@ async def improve_draft(data: ImproveRequest, current_user=Depends(get_current_u
         return {"improved": improved.strip(), "tone": data.tone}
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to improve draft")
+
+
+# ── Conversation topic tags ───────────────────────────────────────────────────
+
+class TopicsRequest(BaseModel):
+    messages: List[str] = Field(..., max_length=20)
+
+
+@router.post("/topics")
+async def detect_topics(data: TopicsRequest, current_user=Depends(get_current_user)):
+    import json, re
+    from src.ai.gemini_client import generate_text
+    if not data.messages:
+        return {"topics": []}
+    snippet = "\n".join(f"- {m[:120]}" for m in data.messages[-12:])
+    prompt = (
+        "Analyse these recent chat messages and identify 2–4 main topics being discussed.\n"
+        "Return ONLY a raw JSON array of short topic strings (2-3 words max each, lowercase, no #).\n"
+        'Example: ["project deadline", "api design", "team standup"]\n\n'
+        f"Messages:\n{snippet}"
+    )
+    try:
+        raw = await generate_text(prompt, temperature=0.3, max_tokens=80)
+        raw = re.sub(r"```[a-z]*\n?", "", raw).strip()
+        match = re.search(r'\[.*?\]', raw, re.DOTALL)
+        topics = json.loads(match.group()) if match else []
+        topics = [str(t).strip().lower() for t in topics if str(t).strip()][:4]
+    except Exception:
+        topics = []
+    return {"topics": topics}
+
+
+# ── Smart message highlights ──────────────────────────────────────────────────
+
+class HighlightMsg(BaseModel):
+    message_id: str
+    sender_name: str
+    content: str
+
+
+class HighlightsRequest(BaseModel):
+    messages: List[HighlightMsg] = Field(..., max_length=60)
+
+
+@router.post("/highlights")
+async def smart_highlights(data: HighlightsRequest, current_user=Depends(get_current_user)):
+    import json, re
+    from src.ai.gemini_client import generate_text
+    if not data.messages:
+        return {"highlights": []}
+    lines = "\n".join(
+        f"[{i}] {m.sender_name}: {m.content[:150]}"
+        for i, m in enumerate(data.messages)
+    )
+    prompt = (
+        "You are analysing a team chat. Identify the 3 most important messages — "
+        "ones containing decisions, deadlines, action items, urgent issues, or key announcements.\n"
+        "Return ONLY a raw JSON array of objects with keys: index (integer), reason (≤8 words).\n"
+        'Example: [{"index":2,"reason":"Deployment deadline set for Friday"},{"index":7,"reason":"Critical bug reported in prod"}]\n\n'
+        f"Messages:\n{lines}"
+    )
+    try:
+        raw = await generate_text(prompt, temperature=0.2, max_tokens=200)
+        raw = re.sub(r"```[a-z]*\n?", "", raw).strip()
+        match = re.search(r'\[.*\]', raw, re.DOTALL)
+        items = json.loads(match.group()) if match else []
+        result = []
+        for item in items[:3]:
+            idx = int(item.get("index", -1))
+            if 0 <= idx < len(data.messages):
+                msg = data.messages[idx]
+                result.append({
+                    "message_id": msg.message_id,
+                    "sender_name": msg.sender_name,
+                    "content": msg.content,
+                    "reason": str(item.get("reason", "Important message")),
+                })
+    except Exception:
+        result = []
+    return {"highlights": result}
+
+
+# ── Message autocomplete ──────────────────────────────────────────────────────
+
+class CompleteRequest(BaseModel):
+    partial: str = Field(..., min_length=5, max_length=500)
+    context: List[str] = []
+
+
+@router.post("/complete")
+async def autocomplete_message(data: CompleteRequest, current_user=Depends(get_current_user)):
+    from src.ai.gemini_client import generate_text
+    ctx = ""
+    if data.context:
+        ctx = "Recent messages:\n" + "\n".join(f"- {m[:100]}" for m in data.context[-3:]) + "\n\n"
+    prompt = (
+        f"{ctx}"
+        f"The user is typing: \"{data.partial}\"\n\n"
+        "Continue this message naturally in 5–12 words. "
+        "Return ONLY the continuation text — no quotes, no repetition of what was typed."
+    )
+    try:
+        completion = await generate_text(prompt, temperature=0.5, max_tokens=60)
+        completion = completion.strip().strip('"').strip("'")
+        return {"completion": completion}
+    except Exception:
+        return {"completion": ""}

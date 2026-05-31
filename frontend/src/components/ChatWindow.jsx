@@ -38,7 +38,11 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [showImprove, setShowImprove] = useState(false)
   const [improveLoading, setImproveLoading] = useState(false)
+  const [topics, setTopics] = useState([])
+  const [completion, setCompletion] = useState('')
+  const [completionLoading, setCompletionLoading] = useState(false)
   const bottomRef = useRef(null)
+  const completionTimerRef = useRef(null)
   const fileRef = useRef(null)
   const attachMenuRef = useRef(null)
   const mediaRecorderRef = useRef(null)
@@ -68,6 +72,34 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [convMessages.length])
+
+  // Auto-detect topics when a group conversation loads/changes
+  useEffect(() => {
+    setTopics([])
+    if (!convId || !activeConversation?.isGroup) return
+    const msgs = (messages[convId] || []).filter((m) => m.media_type === 'text' && !m.deleted).slice(-12)
+    if (msgs.length < 3) return
+    client.post('/ai/topics', { messages: msgs.map((m) => m.content) })
+      .then((r) => setTopics(r.data.topics || []))
+      .catch(() => {})
+  }, [convId])
+
+  // Autocomplete: debounce 2s after user stops typing (20+ chars)
+  useEffect(() => {
+    setCompletion('')
+    clearTimeout(completionTimerRef.current)
+    if (input.trim().length < 20 || completionLoading) return
+    completionTimerRef.current = setTimeout(async () => {
+      setCompletionLoading(true)
+      try {
+        const ctx = (messages[convId] || []).slice(-3).map((m) => m.content)
+        const r = await client.post('/ai/complete', { partial: input.trim(), context: ctx })
+        if (r.data.completion) setCompletion(r.data.completion)
+      } catch { /* silent */ }
+      finally { setCompletionLoading(false) }
+    }, 2000)
+    return () => clearTimeout(completionTimerRef.current)
+  }, [input])
 
   useEffect(() => {
     if (!convId || convMessages.length === 0) { setSuggestions([]); setSuggestionsLoading(false); return }
@@ -124,10 +156,16 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
     sendMessage(text, convId, activeConversation.isGroup)
     setInput('')
     setSuggestions([])
+    setCompletion('')
   }
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+    if (e.key === 'Tab' && completion) {
+      e.preventDefault()
+      setInput((prev) => prev.trimEnd() + ' ' + completion)
+      setCompletion('')
+    }
   }
 
   const handleFileUpload = async (e) => {
@@ -302,7 +340,16 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
             </div>
           </div>
           {activeConversation.isGroup ? (
-            <p className="text-xs text-slate-400">{t('chat.groupChat')}</p>
+            <div className="flex items-center gap-1 flex-wrap mt-0.5">
+              {topics.length > 0
+                ? topics.map((topic) => (
+                    <span key={topic} className="text-xs px-2 py-0.5 rounded-full font-medium bg-indigo-50 text-indigo-500 border border-indigo-100">
+                      #{topic}
+                    </span>
+                  ))
+                : <p className="text-xs text-slate-400">{t('chat.groupChat')}</p>
+              }
+            </div>
           ) : (() => {
             const { text, green } = formatPresence(onlineUsers.has(activeConversation.id), lastSeen[activeConversation.id])
             return <p className={`text-xs font-semibold ${green ? 'text-emerald-500' : 'text-slate-400'}`}>{text}</p>
@@ -355,6 +402,29 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
                 {s}
               </button>
             ))
+          )}
+        </div>
+      )}
+
+      {/* Autocomplete suggestion */}
+      {(completion || completionLoading) && input.trim().length >= 20 && (
+        <div className="px-4 pb-1 flex items-center gap-2 flex-shrink-0">
+          {completionLoading ? (
+            <div className="flex items-center gap-1.5 text-xs text-slate-400">
+              <Loader2 size={11} className="animate-spin text-indigo-400" />
+              <span>Completing…</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setInput((p) => p.trimEnd() + ' ' + completion); setCompletion('') }}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border border-indigo-200 text-indigo-600 hover:bg-indigo-50 transition-all"
+              style={{ background: 'linear-gradient(135deg, #f0f4ff, #f5f3ff)' }}
+              title="Press Tab to accept"
+            >
+              <Sparkles size={10} className="text-indigo-400" />
+              <span className="text-slate-400 italic truncate max-w-[260px]">…{completion}</span>
+              <span className="text-indigo-400 font-bold ml-1">↹</span>
+            </button>
           )}
         </div>
       )}

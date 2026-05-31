@@ -4,7 +4,7 @@ import {
   Users, Loader2, Sparkles, Search, Bot, Settings,
   Mic, Video, FileText, Pencil, Trash2, Shield, ShieldOff,
   UserMinus, UserPlus, Check, X, Send, Paperclip, MessageSquare, Plus,
-  Image, CheckSquare, Square, ExternalLink,
+  Image, CheckSquare, Square, ExternalLink, Star,
 } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
@@ -29,6 +29,8 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
   const [actionItems, setActionItems] = useState([])
   const [checkedItems, setCheckedItems] = useState({})
   const [summarising, setSummarising] = useState(false)
+  const [highlights, setHighlights] = useState([])
+  const [highlightsLoading, setHighlightsLoading] = useState(false)
   const [myRole, setMyRole] = useState('member')
 
   // Group edit state
@@ -69,6 +71,22 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
       setSummary(r.data.summary)
       setActionItems(r.data.action_items || [])
     } catch { toast.error('Summary failed') } finally { setSummarising(false) }
+  }
+
+  const handleHighlights = async () => {
+    if (!activeConversation?.isGroup) return
+    setHighlights([])
+    setHighlightsLoading(true)
+    try {
+      const msgs = (useChatStore.getState().messages[convId] || [])
+        .filter((m) => m.media_type === 'text' && !m.deleted)
+        .slice(-50)
+        .map((m) => ({ message_id: m.message_id, sender_name: m.sender_name || m.sender_id?.slice(0,8) || 'User', content: m.content }))
+      if (msgs.length === 0) { toast('No messages to analyse'); return }
+      const r = await client.post('/ai/highlights', { messages: msgs })
+      setHighlights(r.data.highlights || [])
+      if (!r.data.highlights?.length) toast('No highlights found in recent messages')
+    } catch { toast.error('Highlights failed') } finally { setHighlightsLoading(false) }
   }
 
   const handleEditSave = async () => {
@@ -212,6 +230,9 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
           onAddMember={handleAddMember}
           currentUserId={currentUser?.user_id}
           convName={activeConversation.name}
+          highlights={highlights}
+          highlightsLoading={highlightsLoading}
+          onHighlights={handleHighlights}
           t={t}
         />
       ) : (
@@ -233,6 +254,7 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
 function GroupPanel({
   convId, groupTab, onTabChange, members, myRole, isAdmin,
   summary, actionItems, checkedItems, onToggleCheck, summarising, onSummary,
+  highlights, highlightsLoading, onHighlights,
   editing, editName, editDesc, editLoading,
   onEditStart, onEditCancel, onEditNameChange, onEditDescChange, onEditSave, onDeleteGroup,
   onRoleToggle, onRemoveMember,
@@ -446,6 +468,36 @@ function GroupPanel({
                       {item}
                     </span>
                   </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Smart Highlights */}
+          <button
+            onClick={onHighlights}
+            disabled={highlightsLoading}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-60"
+            style={{ background: 'linear-gradient(135deg, #fefce8, #fef9c3)', color: '#ca8a04' }}
+          >
+            {highlightsLoading ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />}
+            Smart Highlights
+          </button>
+
+          {highlights.length > 0 && (
+            <div className="border border-yellow-200 rounded-xl overflow-hidden"
+                 style={{ background: 'linear-gradient(135deg, #fefce8, #fffbeb)' }}>
+              <div className="flex items-center gap-1.5 px-3 py-2 border-b border-yellow-100">
+                <Star size={12} className="text-yellow-500" />
+                <span className="text-xs font-bold text-yellow-700">Important Messages</span>
+              </div>
+              <div className="p-2 space-y-2">
+                {highlights.map((h, i) => (
+                  <div key={i} className="px-2 py-2 bg-white/70 rounded-lg border border-yellow-100">
+                    <p className="text-xs font-semibold text-yellow-700 mb-0.5">{h.reason}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed line-clamp-2">{h.content}</p>
+                    <p className="text-xs text-slate-400 mt-0.5">— {h.sender_name}</p>
+                  </div>
                 ))}
               </div>
             </div>
