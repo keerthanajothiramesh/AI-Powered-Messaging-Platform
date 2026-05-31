@@ -49,6 +49,8 @@ async def create_group(data: CreateGroupRequest, current_user=Depends(get_curren
             "member_count": len(data.member_ids) + 1,
         },
     }
+    manager.join_group(current_user.user_id, group_id)
+    await manager.send_to_user(current_user.user_id, group_event)
     for member_id in data.member_ids:
         manager.join_group(member_id, group_id)
         await manager.send_to_user(member_id, group_event)

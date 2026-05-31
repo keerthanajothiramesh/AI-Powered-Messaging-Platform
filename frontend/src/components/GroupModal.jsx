@@ -42,13 +42,21 @@ export default function GroupModal({ onClose }) {
     if (!name.trim()) return
     setLoading(true)
     try {
-      await client.post('/groups', {
+      const res = await client.post('/groups', {
         group_name: name,
         description: desc,
         member_ids: selectedMembers.map((m) => m.user_id),
       })
-      const r = await client.get('/groups/me')
-      setGroups(r.data)
+      const newGroup = {
+        group_id: res.data.group_id,
+        group_name: name,
+        description: desc,
+        member_count: selectedMembers.length + 1,
+      }
+      const current = useChatStore.getState().groups
+      if (!current.find((g) => g.group_id === newGroup.group_id)) {
+        setGroups([...current, newGroup])
+      }
       toast.success('Group created!')
       onClose()
     } catch (err) {
