@@ -74,5 +74,9 @@ class AddMemberRequest(BaseModel):
     user_id: str
 
 
+class EditMessageRequest(BaseModel):
+    content: str = Field(..., min_length=1, max_length=10000)
+
+
 class PresenceUpdate(BaseModel):
     status: str = Field(..., pattern="^(online|offline|away)$")

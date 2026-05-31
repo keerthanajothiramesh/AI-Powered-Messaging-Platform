@@ -64,6 +64,16 @@ export function useWebSocket() {
         ])
         toast(`You were added to "${data.group_name}"`, { icon: '👥' })
       }
+    } else if (type === 'message_edited') {
+      const currentUserId = useAuthStore.getState().user?.user_id
+      const convId = data.group_id
+        || (data.sender_id === currentUserId ? data.receiver_id : data.sender_id)
+      if (convId) useChatStore.getState().updateMessage(convId, data.message_id, data.content)
+    } else if (type === 'message_deleted') {
+      const currentUserId = useAuthStore.getState().user?.user_id
+      const convId = data.group_id
+        || (data.sender_id === currentUserId ? data.receiver_id : data.sender_id)
+      if (convId) useChatStore.getState().removeMessage(convId, data.message_id)
     } else if (type === 'message_read') {
       const active = useChatStore.getState().activeConversation
       if (active) updateMessageStatus(active.id, data.message_id, 'read')

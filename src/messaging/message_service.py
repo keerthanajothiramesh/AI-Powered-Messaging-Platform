@@ -151,6 +151,20 @@ async def add_reaction(message_id: str, user_id: str, emoji: str) -> None:
     )
 
 
+async def edit_message(message_id: str, user_id: str, new_content: str) -> Optional[Dict]:
+    db = get_mongo_db()
+    result = await db.messages.update_one(
+        {"message_id": message_id, "sender_id": user_id, "deleted": {"$ne": True}},
+        {"$set": {"content": new_content, "edited": True, "edited_at": datetime.now(timezone.utc)}},
+    )
+    if result.modified_count == 0:
+        return None
+    msg = await db.messages.find_one({"message_id": message_id})
+    if msg:
+        msg.pop("_id", None)
+    return msg
+
+
 async def soft_delete_message(message_id: str, user_id: str) -> bool:
     db = get_mongo_db()
     result = await db.messages.update_one(

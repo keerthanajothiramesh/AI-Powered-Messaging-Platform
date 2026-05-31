@@ -3,12 +3,12 @@ from typing import List, Optional
 
 from src.auth.dependencies import get_current_user
 from src.messaging.schemas import (
-    SendDirectMessageRequest, SendGroupMessageRequest, MessageResponse
+    SendDirectMessageRequest, SendGroupMessageRequest, MessageResponse, EditMessageRequest
 )
 from src.messaging.message_service import (
     save_message, get_direct_messages, get_group_messages,
     mark_message_read, soft_delete_message, add_reaction,
-    get_dm_conversation_list,
+    get_dm_conversation_list, edit_message as edit_message_service,
 )
 from src.messaging.websocket_manager import get_connection_manager
 from src.common.logger import get_logger
@@ -179,11 +179,62 @@ async def read_message(message_id: str, current_user=Depends(get_current_user)):
     return {"status": "ok"}
 
 
+@router.put("/{message_id}")
+async def update_message(
+    message_id: str, data: EditMessageRequest, current_user=Depends(get_current_user)
+):
+    updated = await edit_message_service(message_id, current_user.user_id, data.content)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Message not found or not yours")
+
+    manager = get_connection_manager()
+    event = {
+        "type": "message_edited",
+        "data": {
+            "message_id": message_id,
+            "content": data.content,
+            "sender_id": str(updated.get("sender_id", "")),
+            "receiver_id": str(updated["receiver_id"]) if updated.get("receiver_id") else None,
+            "group_id": str(updated["group_id"]) if updated.get("group_id") else None,
+        },
+    }
+    if updated.get("group_id"):
+        await manager.broadcast_to_group(str(updated["group_id"]), event, exclude_user=current_user.user_id)
+    elif updated.get("receiver_id"):
+        await manager.send_to_user(str(updated["receiver_id"]), event)
+    await manager.send_to_user(current_user.user_id, event)
+
+    return _to_response(updated)
+
+
 @router.delete("/{message_id}")
 async def delete_message(message_id: str, current_user=Depends(get_current_user)):
+    from src.common.database import get_mongo_db
+    db = get_mongo_db()
+    msg = await db.messages.find_one({"message_id": message_id, "sender_id": current_user.user_id})
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found or not yours")
+
     deleted = await soft_delete_message(message_id, current_user.user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Message not found or not yours")
+
+    manager = get_connection_manager()
+    event = {
+        "type": "message_deleted",
+        "data": {
+            "message_id": message_id,
+            "sender_id": str(msg.get("sender_id", "")),
+            "receiver_id": str(msg["receiver_id"]) if msg.get("receiver_id") else None,
+            "group_id": str(msg["group_id"]) if msg.get("group_id") else None,
+        },
+    }
+    if msg.get("group_id"):
+        await manager.broadcast_to_group(str(msg["group_id"]), event, exclude_user=current_user.user_id)
+    elif msg.get("receiver_id"):
+        await manager.send_to_user(str(msg["receiver_id"]), event)
+    await manager.send_to_user(current_user.user_id, event)
+
     return {"status": "deleted"}
 
 

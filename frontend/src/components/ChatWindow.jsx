@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Send, Paperclip, Image, Mic, CheckCheck, Check, Eye } from 'lucide-react'
+import { Send, Paperclip, Image, Mic, CheckCheck, Check, Eye, Pencil, Trash2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
@@ -58,6 +58,22 @@ export default function ChatWindow() {
     } catch { toast.error('Upload failed') }
   }
 
+  const handleEdit = async (messageId, newContent) => {
+    try {
+      await client.put(`/messages/${messageId}`, { content: newContent })
+    } catch {
+      toast.error('Failed to edit message')
+    }
+  }
+
+  const handleDelete = async (messageId) => {
+    try {
+      await client.delete(`/messages/${messageId}`)
+    } catch {
+      toast.error('Failed to delete message')
+    }
+  }
+
   if (!activeConversation) {
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-50">
@@ -90,7 +106,13 @@ export default function ChatWindow() {
           <p className="text-center text-sm text-gray-400 mt-8">{t('chat.noMessages')}</p>
         )}
         {convMessages.map((msg) => (
-          <MessageBubble key={msg.message_id} msg={msg} isOwn={msg.sender_id === user?.user_id} />
+          <MessageBubble
+            key={msg.message_id}
+            msg={msg}
+            isOwn={msg.sender_id === user?.user_id}
+            onEdit={handleEdit}
+            onDelete={handleDelete}
+          />
         ))}
         <div ref={bottomRef} />
       </div>
@@ -125,29 +147,103 @@ export default function ChatWindow() {
   )
 }
 
-function MessageBubble({ msg, isOwn }) {
+function MessageBubble({ msg, isOwn, onEdit, onDelete }) {
+  const [hovered, setHovered] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState(msg.content)
+
+  const isDeleted = msg.deleted
   const isMedia = msg.media_type !== 'text'
   const ts = msg.timestamp ? format(new Date(msg.timestamp), 'HH:mm') : ''
   const reactions = Object.entries(msg.reactions || {})
 
+  const handleEditSubmit = () => {
+    const trimmed = editText.trim()
+    if (trimmed && trimmed !== msg.content) {
+      onEdit(msg.message_id, trimmed)
+    }
+    setEditing(false)
+  }
+
+  const handleEditKeyDown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleEditSubmit() }
+    if (e.key === 'Escape') setEditing(false)
+  }
+
   return (
-    <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+    <div
+      className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
       <div className={`max-w-xs lg:max-w-md ${isOwn ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
+        {isOwn && !isDeleted && !editing && hovered && (
+          <div className="flex gap-1 justify-end">
+            {!isMedia && (
+              <button
+                onClick={() => { setEditText(msg.content); setEditing(true) }}
+                className="p-1 rounded text-gray-400 hover:text-blue-500 hover:bg-gray-100 transition-colors"
+                title="Edit message"
+              >
+                <Pencil size={12} />
+              </button>
+            )}
+            <button
+              onClick={() => onDelete(msg.message_id)}
+              className="p-1 rounded text-gray-400 hover:text-red-500 hover:bg-gray-100 transition-colors"
+              title="Delete message"
+            >
+              <Trash2 size={12} />
+            </button>
+          </div>
+        )}
+
         <div className={`px-4 py-2 rounded-2xl text-sm ${
           isOwn
             ? 'bg-primary text-white rounded-br-sm'
             : 'bg-gray-100 text-gray-900 rounded-bl-sm'
-        }`}>
-          {isMedia ? (
+        } ${isDeleted ? 'opacity-50' : ''}`}>
+          {editing ? (
+            <div className="flex flex-col gap-2" style={{ minWidth: '180px' }}>
+              <textarea
+                value={editText}
+                onChange={(e) => setEditText(e.target.value)}
+                onKeyDown={handleEditKeyDown}
+                rows={2}
+                autoFocus
+                className="bg-white/20 rounded px-2 py-1 text-sm resize-none focus:outline-none w-full"
+              />
+              <div className="flex gap-2 justify-end text-xs">
+                <button
+                  onClick={() => setEditing(false)}
+                  className="px-2 py-0.5 rounded bg-white/20 hover:bg-white/30"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleEditSubmit}
+                  className="px-2 py-0.5 rounded bg-white/30 hover:bg-white/40 font-medium"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          ) : isMedia && !isDeleted ? (
             <div className="flex items-center gap-2">
               {msg.media_type === 'image' && <Image size={16} />}
               {msg.media_type === 'voice' && <Mic size={16} />}
               <span className="text-xs opacity-80">[{msg.media_type}] {msg.content}</span>
             </div>
           ) : (
-            <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+            <p className={`whitespace-pre-wrap break-words ${isDeleted ? 'italic' : ''}`}>
+              {msg.content}
+            </p>
           )}
         </div>
+
+        {msg.edited && !isDeleted && (
+          <span className="text-xs text-gray-400 italic">edited</span>
+        )}
 
         {reactions.length > 0 && (
           <div className="flex gap-1 flex-wrap">

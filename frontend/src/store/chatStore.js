@@ -32,6 +32,26 @@ export const useChatStore = create((set, get) => ({
       },
     })),
 
+  updateMessage: (convId, messageId, content) =>
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [convId]: (s.messages[convId] || []).map((m) =>
+          m.message_id === messageId ? { ...m, content, edited: true } : m
+        ),
+      },
+    })),
+
+  removeMessage: (convId, messageId) =>
+    set((s) => ({
+      messages: {
+        ...s.messages,
+        [convId]: (s.messages[convId] || []).map((m) =>
+          m.message_id === messageId ? { ...m, content: '[Message deleted]', deleted: true } : m
+        ),
+      },
+    })),
+
   setUserOnline: (userId) =>
     set((s) => ({ onlineUsers: new Set([...s.onlineUsers, userId]) })),
 
