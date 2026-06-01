@@ -4,13 +4,14 @@ import {
   Users, Loader2, Sparkles, Search, Bot, Settings,
   Mic, Video, FileText, Pencil, Trash2, Shield, ShieldOff,
   UserMinus, UserPlus, Check, X, Send, Paperclip, MessageSquare, Plus,
-  Image, CheckSquare, Square, ExternalLink, Star,
+  Image, CheckSquare, Square, ExternalLink, Star, HelpCircle,
 } from 'lucide-react'
 import { useChatStore } from '../store/chatStore'
 import { useAuthStore } from '../store/authStore'
 import client from '../api/client'
 import toast from 'react-hot-toast'
 import NotificationsDropdown from './NotificationsDropdown'
+import AIHelpGuide from './AIHelpGuide'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
@@ -556,6 +557,7 @@ function InlineAIChat({ convId, convName, isGroup, otherUserId }) {
   const [loading, setLoading] = useState(false)
   const [listening, setListening] = useState(false)
   const [showEmoji, setShowEmoji] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const bottomRef = useRef(null)
   const fileInputRef = useRef()
   const recRef = useRef(null)
@@ -691,6 +693,13 @@ function InlineAIChat({ convId, convName, isGroup, otherUserId }) {
             title="New thread">
             <Plus size={13} />
           </button>
+          <button
+            onClick={() => setShowHelp(v => !v)}
+            className={`p-1 rounded-lg transition-all ${showHelp ? 'text-indigo-600 bg-indigo-100' : 'text-slate-400 hover:text-indigo-500'}`}
+            title="Feature guide"
+          >
+            <HelpCircle size={13} />
+          </button>
         </div>
       </div>
 
@@ -731,53 +740,61 @@ function InlineAIChat({ convId, convName, isGroup, otherUserId }) {
         </div>
       )}
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-2.5 space-y-2 scrollbar-thin">
-        {msgs.map((msg, i) => (
-          <div key={i}>
-            <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[88%] text-xs rounded-xl px-3 py-2 leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'text-white rounded-br-sm shadow-sm'
-                    : 'bg-slate-50 text-slate-700 border border-slate-100 rounded-bl-sm'
-                }`}
-                style={msg.role === 'user' ? { background: 'linear-gradient(135deg, #6366f1, #7c3aed)' } : {}}
-              >
-                {msg.role === 'bot' && (
-                  <span className="flex items-center gap-1 mb-1">
-                    <Sparkles size={9} className="text-indigo-400" />
-                    <span className="text-xs text-indigo-500 font-semibold">AI ✨</span>
-                  </span>
+      {/* Messages or Help Guide */}
+      {showHelp ? (
+        <AIHelpGuide
+          compact
+          onSelect={(p) => { setInput(p); setShowHelp(false) }}
+          onClose={() => setShowHelp(false)}
+        />
+      ) : (
+        <>
+          <div className="flex-1 overflow-y-auto p-2.5 space-y-2 scrollbar-thin">
+            {msgs.map((msg, i) => (
+              <div key={i}>
+                <div className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className={`max-w-[88%] text-xs rounded-xl px-3 py-2 leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'text-white rounded-br-sm shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border border-slate-100 rounded-bl-sm'
+                    }`}
+                    style={msg.role === 'user' ? { background: 'linear-gradient(135deg, #6366f1, #7c3aed)' } : {}}
+                  >
+                    {msg.role === 'bot' && (
+                      <span className="flex items-center gap-1 mb-1">
+                        <Sparkles size={9} className="text-indigo-400" />
+                        <span className="text-xs text-indigo-500 font-semibold">AI ✨</span>
+                      </span>
+                    )}
+                    <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                  </div>
+                </div>
+                {msg.toolCalls?.length > 0 && (
+                  <div className="mt-1 space-y-1">
+                    {msg.toolCalls.map((tc, j) => <MiniToolCard key={j} tc={tc} />)}
+                  </div>
                 )}
-                <p className="whitespace-pre-wrap break-words">{msg.text}</p>
               </div>
-            </div>
-            {msg.toolCalls?.length > 0 && (
-              <div className="mt-1 space-y-1">
-                {msg.toolCalls.map((tc, j) => <MiniToolCard key={j} tc={tc} />)}
+            ))}
+            {loading && (
+              <div className="flex items-center gap-1.5 text-indigo-400 text-xs px-1">
+                <Loader2 size={11} className="animate-spin" /> Thinking… ✨
               </div>
             )}
+            <div ref={bottomRef} />
           </div>
-        ))}
-        {loading && (
-          <div className="flex items-center gap-1.5 text-indigo-400 text-xs px-1">
-            <Loader2 size={11} className="animate-spin" /> Thinking… ✨
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* Quick starters (first message only) */}
-      {msgs.length === 1 && (
-        <div className="px-2.5 pb-1 space-y-1 flex-shrink-0">
-          {STARTERS.map((ex) => (
-            <button key={ex} onClick={() => send(ex)}
-              className="w-full text-left text-xs text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg transition-all font-medium truncate">
-              "{ex}"
-            </button>
-          ))}
-        </div>
+          {msgs.length === 1 && (
+            <div className="px-2.5 pb-1 space-y-1 flex-shrink-0">
+              {STARTERS.map((ex) => (
+                <button key={ex} onClick={() => send(ex)}
+                  className="w-full text-left text-xs text-indigo-600 hover:bg-indigo-50 px-2.5 py-1.5 rounded-lg transition-all font-medium truncate">
+                  "{ex}"
+                </button>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {/* Input area */}

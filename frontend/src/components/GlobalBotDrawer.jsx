@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { X, Sparkles, Send, Mic, Paperclip, Plus, MessageSquare, Bot, Loader2 } from 'lucide-react'
+import { X, Sparkles, Send, Mic, Paperclip, Plus, MessageSquare, Bot, Loader2, HelpCircle } from 'lucide-react'
 import client from '../api/client'
+import AIHelpGuide from './AIHelpGuide'
 
 const EMOJIS = ['😊','👍','❤️','🎉','😂','🤔','👏','🙏','💡','✅','⚡','🔥','💯','🚀','📌','✨','🎯','👀']
 
@@ -36,6 +37,7 @@ export default function GlobalBotDrawer({ onClose }) {
   const [loading, setLoading] = useState(false)
   const [listening, setListening] = useState(false)
   const [showEmoji, setShowEmoji] = useState(false)
+  const [showHelp, setShowHelp] = useState(false)
   const bottomRef = useRef(null)
   const fileRef = useRef(null)
   const recRef = useRef(null)
@@ -180,6 +182,13 @@ export default function GlobalBotDrawer({ onClose }) {
               <Plus size={14} />
             </button>
             <button
+              onClick={() => setShowHelp(v => !v)}
+              className={`p-1.5 rounded-lg transition-all ${showHelp ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:text-indigo-500 hover:bg-indigo-50'}`}
+              title="Feature guide"
+            >
+              <HelpCircle size={14} />
+            </button>
+            <button
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
             >
@@ -222,49 +231,56 @@ export default function GlobalBotDrawer({ onClose }) {
           </div>
         )}
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {msgs.map((msg, i) => (
-            <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div
-                className={`max-w-[85%] text-sm rounded-2xl px-4 py-2.5 leading-relaxed ${
-                  msg.role === 'user'
-                    ? 'text-white rounded-br-sm shadow-sm'
-                    : 'bg-slate-50 text-slate-700 border border-slate-100 rounded-bl-sm'
-                }`}
-                style={msg.role === 'user' ? { background: 'linear-gradient(135deg, #6366f1, #7c3aed)' } : {}}
-              >
-                {msg.role === 'bot' && (
-                  <span className="flex items-center gap-1.5 mb-1.5">
-                    <Sparkles size={10} className="text-indigo-400" />
-                    <span className="text-xs text-indigo-500 font-semibold">AI ✨</span>
-                  </span>
-                )}
-                <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+        {/* Messages or Help Guide */}
+        {showHelp ? (
+          <AIHelpGuide
+            onSelect={(p) => { setInput(p); setShowHelp(false) }}
+            onClose={() => setShowHelp(false)}
+          />
+        ) : (
+          <>
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {msgs.map((msg, i) => (
+                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    className={`max-w-[85%] text-sm rounded-2xl px-4 py-2.5 leading-relaxed ${
+                      msg.role === 'user'
+                        ? 'text-white rounded-br-sm shadow-sm'
+                        : 'bg-slate-50 text-slate-700 border border-slate-100 rounded-bl-sm'
+                    }`}
+                    style={msg.role === 'user' ? { background: 'linear-gradient(135deg, #6366f1, #7c3aed)' } : {}}
+                  >
+                    {msg.role === 'bot' && (
+                      <span className="flex items-center gap-1.5 mb-1.5">
+                        <Sparkles size={10} className="text-indigo-400" />
+                        <span className="text-xs text-indigo-500 font-semibold">AI ✨</span>
+                      </span>
+                    )}
+                    <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                  </div>
+                </div>
+              ))}
+              {loading && (
+                <div className="flex items-center gap-2 text-indigo-400 text-sm px-1">
+                  <Loader2 size={13} className="animate-spin" /> Thinking…
+                </div>
+              )}
+              <div ref={bottomRef} />
+            </div>
+            {msgs.length === 1 && (
+              <div className="px-4 pb-2 space-y-1.5 flex-shrink-0">
+                {STARTERS.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => send(s.replace(/^"|"$/g, ''))}
+                    className="w-full text-left text-xs text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-xl transition-all font-medium"
+                  >
+                    {s}
+                  </button>
+                ))}
               </div>
-            </div>
-          ))}
-          {loading && (
-            <div className="flex items-center gap-2 text-indigo-400 text-sm px-1">
-              <Loader2 size={13} className="animate-spin" /> Thinking…
-            </div>
-          )}
-          <div ref={bottomRef} />
-        </div>
-
-        {/* Quick starters */}
-        {msgs.length === 1 && (
-          <div className="px-4 pb-2 space-y-1.5 flex-shrink-0">
-            {STARTERS.map((s) => (
-              <button
-                key={s}
-                onClick={() => send(s.replace(/^"|"$/g, ''))}
-                className="w-full text-left text-xs text-indigo-600 hover:bg-indigo-50 px-3 py-2 rounded-xl transition-all font-medium"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+            )}
+          </>
         )}
 
         {/* Input */}
