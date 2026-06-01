@@ -68,30 +68,40 @@ async def catch_up_summary(user_id: str, offline_since: datetime) -> Dict:
 
         return row["group_name"], str(row["group_id"]), summary, len(msgs)
 
-    group_results = await asyncio.gather(*[_summarise_group(r) for r in group_rows])
+    group_results = await asyncio.gather(
+        *[_summarise_group(r) for r in group_rows],
+        return_exceptions=True,
+    )
 
-    for name, gid, summary, count in group_results:
+    for item in group_results:
+        if isinstance(item, Exception):
+            logger.warning("group_catchup_failed", error=str(item))
+            continue
+        name, gid, summary, count = item
         if summary:
             group_summaries[name] = {"count": count, "summary": summary, "group_id": gid}
             total_missed += count
 
     dm_summary = None
     if direct_messages:
-        umap = await build_user_map(direct_messages)
-        chunks = chunk_by_tokens(direct_messages)
-        if len(chunks) == 1:
-            text = format_messages(direct_messages, umap)
-            dm_summary = await generate_text(
-                f"Summarise these direct messages the user missed:\n\n{text}",
-                system_prompt=CATCHUP_PROMPT, max_tokens=256,
-            )
-        else:
-            chunk_sums = await summarise_chunks_parallel(
-                chunks,
-                prompt_fn=lambda t: f"Summarise these direct messages the user missed:\n\n{t}",
-                system_prompt=CATCHUP_PROMPT, max_tokens=256, user_map=umap,
-            )
-            dm_summary = await hierarchical_merge(chunk_sums, CATCHUP_PROMPT, label="direct messages")
+        try:
+            umap = await build_user_map(direct_messages)
+            chunks = chunk_by_tokens(direct_messages)
+            if len(chunks) == 1:
+                text = format_messages(direct_messages, umap)
+                dm_summary = await generate_text(
+                    f"Summarise these direct messages the user missed:\n\n{text}",
+                    system_prompt=CATCHUP_PROMPT, max_tokens=256,
+                )
+            else:
+                chunk_sums = await summarise_chunks_parallel(
+                    chunks,
+                    prompt_fn=lambda t: f"Summarise these direct messages the user missed:\n\n{t}",
+                    system_prompt=CATCHUP_PROMPT, max_tokens=256, user_map=umap,
+                )
+                dm_summary = await hierarchical_merge(chunk_sums, CATCHUP_PROMPT, label="direct messages")
+        except Exception as exc:
+            logger.warning("dm_catchup_failed", error=str(exc))
 
     return {
         "total_missed": total_missed,

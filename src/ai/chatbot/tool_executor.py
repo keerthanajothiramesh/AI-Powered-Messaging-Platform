@@ -1,6 +1,11 @@
 """Executes chatbot tool calls, mapping tool names to backend services."""
 from typing import Any, Dict
 
+from src.ai.chatbot.tool_executor_extras import (
+    fetch_unread_images as _fetch_unread_images_impl,
+    send_message as _send_message_impl,
+    get_group_members_status as _get_group_members_status_impl,
+)
 from src.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -20,7 +25,11 @@ async def execute_tool(tool_name: str, args: Dict, session) -> Any:
         if tool_name == "get_user_activity":
             return await _get_user_activity(args)
         if tool_name == "fetch_unread_images":
-            return await _fetch_unread_images(session)
+            return await _fetch_unread_images_impl(session)
+        if tool_name == "send_message":
+            return await _send_message_impl(args, session)
+        if tool_name == "get_group_members_status":
+            return await _get_group_members_status_impl(args)
     except Exception as exc:
         logger.error("tool_execution_failed", tool=tool_name, error=str(exc))
         return {"error": str(exc)}
@@ -102,44 +111,3 @@ async def _get_user_activity(args: Dict) -> Any:
     }
 
 
-async def _fetch_unread_images(session) -> Any:
-    from src.common.database import get_mongo_db, get_pg_pool
-    db = get_mongo_db()
-    pool = get_pg_pool()
-    async with pool.acquire() as conn:
-        rows = await conn.fetch(
-            "SELECT g.group_id, g.group_name FROM groups g "
-            "JOIN group_members gm ON g.group_id = gm.group_id WHERE gm.user_id = $1",
-            session.user_id,
-        )
-    group_map = {str(r["group_id"]): r["group_name"] for r in rows}
-    group_ids = list(group_map.keys())
-
-    cursor = db.messages.find(
-        {
-            "media_type": "image",
-            "$or": [
-                {"receiver_id": session.user_id, "read_status": "unread"},
-                {"group_id": {"$in": group_ids}, "sender_id": {"$ne": session.user_id},
-                 "read_by": {"$not": {"$elemMatch": {"$eq": session.user_id}}}},
-            ],
-        },
-        {"message_id": 1, "media_url": 1, "content": 1, "sender_id": 1,
-         "group_id": 1, "receiver_id": 1, "timestamp": 1},
-    ).limit(20).sort("timestamp", -1)
-
-    results = []
-    async for msg in cursor:
-        gid = str(msg.get("group_id") or "")
-        ts = msg.get("timestamp")
-        results.append({
-            "message_id": str(msg.get("message_id") or str(msg["_id"])),
-            "media_url": msg.get("media_url") or "",
-            "content": msg.get("content") or "",
-            "sender_id": str(msg.get("sender_id") or ""),
-            "group_id": gid,
-            "receiver_id": str(msg.get("receiver_id") or ""),
-            "timestamp": ts.isoformat() if hasattr(ts, "isoformat") else str(ts or ""),
-            "group_name": group_map.get(gid, ""),
-        })
-    return results

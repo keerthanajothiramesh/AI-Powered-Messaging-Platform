@@ -76,6 +76,35 @@ CHATBOT_TOOLS = [
         ),
         "parameters": {"type": "object", "properties": {}, "required": []},
     },
+    {
+        "name": "send_message",
+        "description": (
+            "Send a direct message to another user by name. Use when the user asks to "
+            "send, forward, or remind someone of something."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "recipient_name": {"type": "string", "description": "Display name of the recipient"},
+                "message": {"type": "string", "description": "Message text to send"},
+            },
+            "required": ["recipient_name", "message"],
+        },
+    },
+    {
+        "name": "get_group_members_status",
+        "description": (
+            "List members of a group with their online/offline status. "
+            "Use when the user asks who is online in a group."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "group_name": {"type": "string", "description": "Name of the group"},
+            },
+            "required": ["group_name"],
+        },
+    },
 ]
 
 
