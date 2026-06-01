@@ -41,8 +41,12 @@ Ensure at-least-once message delivery.""",
         )
 
     async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        from src.common.database import get_mongo_db
-        db = get_mongo_db()
+        try:
+            from src.common.database import get_mongo_db
+            db = get_mongo_db()
+        except Exception as exc:
+            logger.error("delivery_agent_db_unavailable", error=str(exc))
+            return {"agent": self.name, "failed_found": 0, "recovered": 0, "escalated": 0, "pending": 0}
         now = datetime.now(timezone.utc)
         backoff_cutoff = now - timedelta(minutes=_BACKOFF_MINUTES)
 

@@ -129,7 +129,7 @@ class TestNotificationAgentFatigue:
                    })):
             result = await NotificationAgent().run({
                 "user_id": "test-user",
-                "content": "Just checking in",
+                "content": "Here is a general update about the weekly progress report, no action needed from your end at this time.",
             })
 
         assert result["suppressed"] is True

@@ -218,11 +218,35 @@ def print_report(search_results: list, summ_results: list) -> None:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 async def main(args) -> dict:
-    from src.ai.gemini_client import init_openai
     from src.config import settings
+    from src.ai.gemini_client import init_openai
+    from src.common.database import init_postgres, init_mongodb, get_pg_pool, create_pg_tables, create_mongo_indexes, get_mongo_db
 
     if settings.OPENAI_API_KEY:
         init_openai(settings.OPENAI_API_KEY)
+
+    if settings.NEON_DATABASE_URL:
+        await init_postgres(settings.NEON_DATABASE_URL)
+        pool = get_pg_pool()
+        await create_pg_tables(pool)
+        from src.ai.vector_store import init_vector_store
+        init_vector_store(pool)
+        from src.ai.embedding_service import init_embedding_service
+        init_embedding_service()
+    else:
+        print("WARNING: NEON_DATABASE_URL not set — semantic search will be skipped")
+
+    if settings.MONGODB_URL:
+        try:
+            await init_mongodb(settings.MONGODB_URL)
+            db = get_mongo_db()
+            await create_mongo_indexes(db)
+            print("MongoDB connected ✓")
+        except Exception as e:
+            print(f"WARNING: MongoDB connection failed — {e}")
+            print("Fix: Add your local IP to MongoDB Atlas → Network Access → Add IP Address")
+    else:
+        print("WARNING: MONGODB_URL not set — BM25 search and summarisation will fail")
 
     gt = _load_ground_truth()
     search_cases = gt["search"]
