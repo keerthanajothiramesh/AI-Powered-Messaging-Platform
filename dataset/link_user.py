@@ -1,25 +1,30 @@
 """Link a real user account to the synthetic dataset.
 
-Does two things:
-1. Adds the user to all 25 synthetic groups in group_members
-   (so group catch-up, group summaries, and group messages all work)
-2. Remaps 100 synthetic DM messages to have receiver_id = real user's UUID
-   (so DM catch-up and direct message summaries work)
+1. Adds the user to all synthetic groups (group summaries + catch-up work)
+2. Remaps 100 synthetic DM messages to receiver_id = real user UUID
 
 Usage:
     python dataset/link_user.py --email your@email.com
 """
 import asyncio
-import asyncpg
-import motor.motor_asyncio
 import argparse
-import random
-from datetime import datetime, timezone, timedelta
-from dotenv import load_dotenv
 import os
+import random
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from urllib.parse import urlparse, quote_plus, urlunparse
 
+import asyncpg
+import motor.motor_asyncio
+from dotenv import load_dotenv
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 load_dotenv()
+
+from src.common.logger import configure_logging, get_logger
+configure_logging("INFO")
+logger = get_logger(__name__)
 
 
 def _encode_mongo_url(url: str) -> str:
@@ -37,35 +42,32 @@ def _encode_mongo_url(url: str) -> str:
 
 
 async def link_user(email: str):
-    # ── PostgreSQL ────────────────────────────────────────────────────────────
     pg_url = os.getenv("NEON_DATABASE_URL", "").replace("postgresql+asyncpg://", "postgresql://")
     if not pg_url:
-        print("ERROR: NEON_DATABASE_URL not set in .env")
+        logger.error("missing_env", var="NEON_DATABASE_URL")
         return
 
     pool = await asyncpg.create_pool(pg_url, min_size=2, max_size=5)
 
-    # Find the real user by email
     async with pool.acquire() as conn:
         user = await conn.fetchrow(
             "SELECT user_id, display_name FROM users WHERE email = $1", email
         )
 
     if not user:
-        print(f"ERROR: No user found with email '{email}'")
-        print("Register this account in the app first, then re-run this script.")
+        logger.error("user_not_found", email=email)
+        logger.info("hint", msg="Register this account in the app first, then re-run this script.")
         await pool.close()
         return
 
-    real_user_id = user["user_id"]          # UUID object
-    real_user_id_str = str(real_user_id)    # string for MongoDB
-    print(f"Found: {user['display_name']} ({real_user_id_str})")
+    real_user_id = user["user_id"]
+    real_user_id_str = str(real_user_id)
+    logger.info("user_found", display_name=user["display_name"], user_id=real_user_id_str)
 
-    # ── Step 1: Add to all groups ─────────────────────────────────────────────
     async with pool.acquire() as conn:
         groups = await conn.fetch("SELECT group_id, group_name FROM groups")
 
-    print(f"\nAdding to {len(groups)} groups...")
+    logger.info("adding_to_groups", total=len(groups))
     added = 0
     async with pool.acquire() as conn:
         for g in groups:
@@ -77,59 +79,42 @@ async def link_user(email: str):
                     g["group_id"], real_user_id,
                 )
                 added += 1
-            except Exception as e:
-                print(f"  Warning ({g['group_name']}): {e}")
+            except Exception as exc:
+                logger.warning("group_add_failed", group=g["group_name"], error=str(exc))
+    logger.info("groups_added", added=added, total=len(groups))
 
-    print(f"  Done — added to {added}/{len(groups)} groups ✓")
-
-    # ── Step 2: Remap DM messages in MongoDB ──────────────────────────────────
     mongo_url = os.getenv("MONGODB_URL", "")
     if not mongo_url:
-        print("\nERROR: MONGODB_URL not set in .env — skipping DM remap")
+        logger.error("missing_env", var="MONGODB_URL", note="skipping DM remap")
         await pool.close()
         return
 
     mongo_client = motor.motor_asyncio.AsyncIOMotorClient(_encode_mongo_url(mongo_url))
     db = mongo_client["messaging"]
 
-    # Pick DM messages (group_id=null, not already addressed to real user)
     since = datetime.now(timezone.utc) - timedelta(days=90)
     cursor = db.messages.find(
-        {
-            "group_id": None,
-            "receiver_id": {"$exists": True, "$ne": real_user_id_str},
-            "timestamp": {"$gte": since},
-        },
-        {"message_id": 1}
+        {"group_id": None, "receiver_id": {"$exists": True, "$ne": real_user_id_str},
+         "timestamp": {"$gte": since}},
+        {"message_id": 1},
     ).limit(200)
-
     dm_messages = await cursor.to_list(length=200)
 
     if not dm_messages:
-        print("\nNo DM messages found in dataset to remap.")
+        logger.warning("no_dm_messages_found")
     else:
         sample = random.sample(dm_messages, min(100, len(dm_messages)))
         ids = [m["message_id"] for m in sample]
-
         result = await db.messages.update_many(
             {"message_id": {"$in": ids}},
-            {"$set": {"receiver_id": real_user_id_str}}
+            {"$set": {"receiver_id": real_user_id_str}},
         )
-        print(f"\nRemapped {result.modified_count} DM messages to your inbox ✓")
+        logger.info("dms_remapped", count=result.modified_count)
 
     await pool.close()
     mongo_client.close()
-
-    print(f"""
-Done! Your account is now linked to the synthetic dataset.
-
-Login: {email}
-Groups: all {len(groups)} synthetic groups joined
-DMs: 100 messages remapped to your inbox
-
-Catch-up summary, group summaries, and AI features will now
-work when you log in with your own credentials.
-""")
+    logger.info("link_user_complete", email=email,
+                groups_joined=len(groups), dms_remapped=min(100, len(dm_messages)))
 
 
 if __name__ == "__main__":

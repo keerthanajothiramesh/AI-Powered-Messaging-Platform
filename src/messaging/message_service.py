@@ -1,7 +1,9 @@
+"""Core message persistence and retrieval."""
 import uuid
-from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Dict, Any
-from src.common.database import get_mongo_db, get_pg_pool
+from datetime import datetime, timezone
+from typing import Dict, List, Optional
+
+from src.common.database import get_mongo_db
 from src.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -16,23 +18,15 @@ async def save_message(
     group_id: Optional[str] = None,
     language: str = "en",
     delivery_status: str = "sent",
-) -> Dict[str, Any]:
+) -> Dict:
     db = get_mongo_db()
     message = {
         "message_id": str(uuid.uuid4()),
-        "sender_id": sender_id,
-        "receiver_id": receiver_id,
-        "group_id": group_id,
-        "content": content,
-        "media_type": media_type,
-        "media_url": media_url,
-        "delivery_status": delivery_status,
-        "read_status": "unread",
-        "reactions": {},
-        "read_by": [],
-        "language": language,
-        "timestamp": datetime.now(timezone.utc),
-        "conversation_summary": None,
+        "sender_id": sender_id, "receiver_id": receiver_id, "group_id": group_id,
+        "content": content, "media_type": media_type, "media_url": media_url,
+        "delivery_status": delivery_status, "read_status": "unread",
+        "reactions": {}, "read_by": [], "language": language,
+        "timestamp": datetime.now(timezone.utc), "conversation_summary": None,
     }
     await db.messages.insert_one(message)
     message.pop("_id", None)
@@ -45,13 +39,10 @@ async def get_direct_messages(
 ) -> List[Dict]:
     db = get_mongo_db()
     cursor = db.messages.find(
-        {
-            "$or": [
-                {"sender_id": user_id, "receiver_id": other_user_id},
-                {"sender_id": other_user_id, "receiver_id": user_id},
-            ],
-            "group_id": None,
-        }
+        {"$or": [
+            {"sender_id": user_id, "receiver_id": other_user_id},
+            {"sender_id": other_user_id, "receiver_id": user_id},
+        ], "group_id": None},
     ).sort("timestamp", -1).skip(skip).limit(limit)
     messages = await cursor.to_list(length=limit)
     for m in messages:
@@ -62,31 +53,14 @@ async def get_direct_messages(
 async def get_dm_conversation_list(user_id: str) -> List[Dict]:
     db = get_mongo_db()
     pipeline = [
-        {
-            "$match": {
-                "$or": [{"sender_id": user_id}, {"receiver_id": user_id}],
-                "group_id": None,
-            }
-        },
-        {
-            "$addFields": {
-                "other_user_id": {
-                    "$cond": {
-                        "if": {"$eq": ["$sender_id", user_id]},
-                        "then": "$receiver_id",
-                        "else": "$sender_id",
-                    }
-                }
-            }
-        },
+        {"$match": {"$or": [{"sender_id": user_id}, {"receiver_id": user_id}], "group_id": None}},
+        {"$addFields": {"other_user_id": {"$cond": {
+            "if": {"$eq": ["$sender_id", user_id]}, "then": "$receiver_id", "else": "$sender_id"
+        }}}},
         {"$sort": {"timestamp": -1}},
-        {
-            "$group": {
-                "_id": "$other_user_id",
-                "last_message": {"$first": "$content"},
-                "last_timestamp": {"$first": "$timestamp"},
-            }
-        },
+        {"$group": {"_id": "$other_user_id",
+                    "last_message": {"$first": "$content"},
+                    "last_timestamp": {"$first": "$timestamp"}}},
         {"$sort": {"last_timestamp": -1}},
         {"$limit": 50},
     ]
@@ -97,14 +71,11 @@ async def get_dm_conversation_list(user_id: str) -> List[Dict]:
             "last_message": r.get("last_message", ""),
             "last_timestamp": r["last_timestamp"].isoformat() if r.get("last_timestamp") else None,
         }
-        for r in results
-        if r["_id"]
+        for r in results if r["_id"]
     ]
 
 
-async def get_group_messages(
-    group_id: str, limit: int = 50, skip: int = 0
-) -> List[Dict]:
+async def get_group_messages(group_id: str, limit: int = 50, skip: int = 0) -> List[Dict]:
     db = get_mongo_db()
     cursor = db.messages.find({"group_id": group_id}).sort("timestamp", -1).skip(skip).limit(limit)
     messages = await cursor.to_list(length=limit)
@@ -113,61 +84,18 @@ async def get_group_messages(
     return list(reversed(messages))
 
 
-async def update_delivery_status(message_id: str, status: str) -> None:
-    db = get_mongo_db()
-    update: dict = {"$set": {"delivery_status": status}}
-    if status == "queued":
-        update["$set"]["queued_at"] = datetime.now(timezone.utc)
-    else:
-        update["$unset"] = {"queued_at": ""}
-    await db.messages.update_one({"message_id": message_id}, update)
-
-
 async def mark_message_read(message_id: str, user_id: str) -> None:
     db = get_mongo_db()
     await db.messages.update_one(
         {"message_id": message_id},
-        {
-            "$set": {"read_status": "read"},
-            "$addToSet": {"read_by": user_id},
-        },
+        {"$set": {"read_status": "read"}, "$addToSet": {"read_by": user_id}},
     )
-
-
-async def get_queued_messages(user_id: str) -> List[Dict]:
-    db = get_mongo_db()
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-    cursor = db.messages.find(
-        {
-            "receiver_id": user_id,
-            "delivery_status": "queued",
-            "queued_at": {"$gte": cutoff},
-        }
-    ).sort("timestamp", 1)
-    messages = await cursor.to_list(length=500)
-    for m in messages:
-        m.pop("_id", None)
-    return messages
-
-
-async def expire_stale_queued_messages() -> int:
-    """Mark queued messages older than 30 days as expired so they are skipped on future reconnects."""
-    db = get_mongo_db()
-    cutoff = datetime.now(timezone.utc) - timedelta(days=30)
-    result = await db.messages.update_many(
-        {"delivery_status": "queued", "queued_at": {"$lt": cutoff}},
-        {"$set": {"delivery_status": "expired"}, "$unset": {"queued_at": ""}},
-    )
-    if result.modified_count:
-        logger.info("queued_messages_expired", count=result.modified_count)
-    return result.modified_count
 
 
 async def add_reaction(message_id: str, user_id: str, emoji: str) -> None:
     db = get_mongo_db()
     await db.messages.update_one(
-        {"message_id": message_id},
-        {"$addToSet": {f"reactions.{emoji}": user_id}},
+        {"message_id": message_id}, {"$addToSet": {f"reactions.{emoji}": user_id}}
     )
 
 
@@ -194,12 +122,8 @@ async def soft_delete_message(message_id: str, user_id: str) -> bool:
     return result.modified_count > 0
 
 
-async def get_messages_since(user_id: str, since: datetime) -> List[Dict]:
-    db = get_mongo_db()
-    cursor = db.messages.find(
-        {"receiver_id": user_id, "timestamp": {"$gte": since}}
-    ).sort("timestamp", 1)
-    messages = await cursor.to_list(length=1000)
-    for m in messages:
-        m.pop("_id", None)
-    return messages
+# Re-export queue helpers for backward compat
+from src.messaging.message_queue import (  # noqa: F401, E402
+    update_delivery_status, get_queued_messages,
+    expire_stale_queued_messages, get_messages_since,
+)

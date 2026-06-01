@@ -338,18 +338,28 @@ def save_to_files(users, groups, group_members, messages, events):
     with open(OUTPUT_DIR / "dataset_summary.json", "w") as f:
         json.dump(summary, f, indent=2)
 
-    print(f"Dataset generated:")
-    for k, v in summary.items():
-        print(f"  {k}: {v:,}")
+    import sys
+    import os
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from src.common.logger import configure_logging, get_logger as _get_logger
+    _log = _get_logger(__name__)
+    _log.info("dataset_generated", **{k: v for k, v in summary.items()})
 
 
 if __name__ == "__main__":
-    print("Generating synthetic dataset...")
+    import sys
+    import os
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from src.common.logger import configure_logging, get_logger as _get_logger
+    configure_logging("INFO")
+    _log = _get_logger(__name__)
+
+    _log.info("generating_synthetic_dataset")
     users = generate_users(130, 20)
-    print(f"  Users: {len(users)}")
+    _log.info("users_generated", count=len(users))
     groups, group_members = generate_groups(users)
-    print(f"  Groups: {len(groups)}, Members: {len(group_members)}")
+    _log.info("groups_generated", groups=len(groups), members=len(group_members))
     messages, events = generate_messages(users, groups, group_members, 60000)
-    print(f"  Messages: {len(messages)}")
+    _log.info("messages_generated", count=len(messages))
     save_to_files(users, groups, group_members, messages, events)
-    print("Done!")
+    _log.info("dataset_complete")

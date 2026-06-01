@@ -118,9 +118,12 @@ from src.common.health import router as health_router
 from src.auth.router import router as auth_router
 from src.messaging.user_router import router as user_router
 from src.messaging.group_router import router as group_router
+from src.messaging.group_admin_router import router as group_admin_router
 from src.messaging.message_router import router as message_router
+from src.messaging.message_extras_router import router as message_extras_router
 from src.messaging.websocket_router import router as ws_router
 from src.ai.router import router as ai_router
+from src.ai.text_router import router as ai_text_router
 from src.search.router import router as search_router
 from src.media.router import router as media_router
 from src.notifications.router import router as notif_router
@@ -131,9 +134,12 @@ app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(group_router)
+app.include_router(group_admin_router)
 app.include_router(message_router)
+app.include_router(message_extras_router)
 app.include_router(ws_router)
 app.include_router(ai_router)
+app.include_router(ai_text_router)
 app.include_router(search_router)
 app.include_router(media_router)
 app.include_router(notif_router)

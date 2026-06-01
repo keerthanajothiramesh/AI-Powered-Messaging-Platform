@@ -2,10 +2,10 @@
 Reads messages directly from MongoDB Atlas — no local JSON files required.
 """
 import asyncio
-import time
-from pathlib import Path
 import sys
 import os
+import time
+from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 os.chdir(Path(__file__).parent.parent)
@@ -13,9 +13,12 @@ os.chdir(Path(__file__).parent.parent)
 from dotenv import load_dotenv
 load_dotenv()
 
+from src.common.logger import configure_logging, get_logger
+configure_logging("INFO")
+logger = get_logger(__name__)
+
 NEON_DATABASE_URL = os.getenv("NEON_DATABASE_URL", "")
 MONGODB_URL = os.getenv("MONGODB_URL", "")
-
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 EMBEDDING_DIM = 384
 BATCH_SIZE = 256
@@ -23,59 +26,51 @@ BATCH_SIZE = 256
 
 async def run():
     if not NEON_DATABASE_URL:
-        print("ERROR: NEON_DATABASE_URL not set in .env")
+        logger.error("missing_env", var="NEON_DATABASE_URL")
         sys.exit(1)
     if not MONGODB_URL:
-        print("ERROR: MONGODB_URL not set in .env")
+        logger.error("missing_env", var="MONGODB_URL")
         sys.exit(1)
 
-    print(f"Loading embedding model: {MODEL_NAME} ({EMBEDDING_DIM}-dim, ONNX)")
+    logger.info("loading_model", model=MODEL_NAME, dim=EMBEDDING_DIM)
     from fastembed import TextEmbedding
     model = TextEmbedding(MODEL_NAME)
-    print("Model ready.\n")
+    logger.info("model_ready")
 
-    # Connect to MongoDB
     from motor.motor_asyncio import AsyncIOMotorClient
     mongo = AsyncIOMotorClient(MONGODB_URL)
     db = mongo["messaging_platform"]
     collection = db["messages"]
 
     total_in_mongo = await collection.count_documents({})
-    print(f"MongoDB: {total_in_mongo:,} total messages")
+    logger.info("mongodb_connected", total_messages=total_in_mongo)
 
-    # Connect to Neon PostgreSQL
     import asyncpg
     from pgvector.asyncpg import register_vector
-
     clean_url = NEON_DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
     conn = await asyncpg.connect(clean_url)
     await register_vector(conn)
-    print("Connected to Neon PostgreSQL.")
+    logger.info("postgres_connected")
 
     await conn.execute("CREATE EXTENSION IF NOT EXISTS vector")
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS message_embeddings (
-            message_id TEXT PRIMARY KEY,
-            embedding vector(384),
-            content TEXT NOT NULL,
-            sender_id TEXT DEFAULT '',
-            group_id TEXT DEFAULT '',
-            receiver_id TEXT DEFAULT '',
-            media_type TEXT DEFAULT 'text',
-            language TEXT DEFAULT 'en',
+            message_id TEXT PRIMARY KEY, embedding vector(384),
+            content TEXT NOT NULL, sender_id TEXT DEFAULT '',
+            group_id TEXT DEFAULT '', receiver_id TEXT DEFAULT '',
+            media_type TEXT DEFAULT 'text', language TEXT DEFAULT 'en',
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
 
     already = await conn.fetchval("SELECT COUNT(*) FROM message_embeddings")
-    print(f"Already indexed: {already:,}\n")
+    logger.info("already_indexed", count=already)
 
-    # Fetch already-indexed IDs to skip them
     existing_ids = set()
     if already > 0:
         rows = await conn.fetch("SELECT message_id FROM message_embeddings")
         existing_ids = {r["message_id"] for r in rows}
-        print(f"Skipping {len(existing_ids):,} already-indexed messages.")
+        logger.info("skipping_existing", count=len(existing_ids))
 
     total_indexed = 0
     batch = []
@@ -92,29 +87,28 @@ async def run():
         if mid in existing_ids:
             continue
         batch.append({
-            "message_id": mid,
-            "content": msg["content"],
+            "message_id": mid, "content": msg["content"],
             "sender_id": str(msg.get("sender_id") or ""),
             "group_id": str(msg.get("group_id") or ""),
             "receiver_id": str(msg.get("receiver_id") or ""),
             "media_type": msg.get("media_type", "text"),
             "language": msg.get("language", "en"),
         })
-
         if len(batch) >= BATCH_SIZE:
             await _flush(conn, model, batch)
             total_indexed += len(batch)
             batch = []
             if total_indexed % 2000 == 0:
                 elapsed = time.time() - t0
-                print(f"  Indexed {total_indexed:,} ({total_indexed / max(elapsed, 1):.0f} msgs/sec)...")
+                logger.info("indexing_progress", indexed=total_indexed,
+                            rate=round(total_indexed / max(elapsed, 1)))
 
     if batch:
         await _flush(conn, model, batch)
         total_indexed += len(batch)
 
     if total_indexed > 0:
-        print("\nBuilding HNSW index...")
+        logger.info("building_hnsw_index")
         await conn.execute("""
             CREATE INDEX IF NOT EXISTS msg_emb_hnsw_idx
             ON message_embeddings USING hnsw (embedding vector_cosine_ops)
@@ -126,23 +120,17 @@ async def run():
     mongo.close()
 
     elapsed = time.time() - t0
-    print(f"\nEmbeddings complete!")
-    print(f"  New this run  : {total_indexed:,}")
-    print(f"  DB total      : {count:,}")
-    print(f"  Time          : {elapsed:.1f}s")
-    if total_indexed:
-        print(f"  Rate          : {total_indexed / max(elapsed, 1):.0f} msgs/sec")
+    logger.info("embeddings_complete", new_this_run=total_indexed, db_total=count,
+                elapsed_s=round(elapsed, 1),
+                rate=round(total_indexed / max(elapsed, 1)) if total_indexed else 0)
 
 
 async def _flush(conn, model, batch):
     texts = [m["content"] for m in batch]
     vecs = list(model.embed(texts))
     records = [
-        (
-            m["message_id"], v.tolist(), m["content"],
-            m["sender_id"], m["group_id"], m["receiver_id"],
-            m["media_type"], m["language"],
-        )
+        (m["message_id"], v.tolist(), m["content"], m["sender_id"],
+         m["group_id"], m["receiver_id"], m["media_type"], m["language"])
         for m, v in zip(batch, vecs)
     ]
     await conn.executemany(

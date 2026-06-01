@@ -27,7 +27,6 @@ class RCAAgent(BaseAgent):
         window_hours = int(input_data.get("hours", 72))
         since = now - timedelta(hours=window_hours)
 
-        # ── Collect failure statistics ────────────────────────────────────────
         pipeline = [
             {"$match": {
                 "delivery_status": {"$in": ["failed", "queued"]},
@@ -42,7 +41,6 @@ class RCAAgent(BaseAgent):
         ]
         status_stats = await db.messages.aggregate(pipeline).to_list(length=10)
 
-        # Top affected receivers
         receiver_pipeline = [
             {"$match": {
                 "delivery_status": {"$in": ["failed", "queued"]},
@@ -54,7 +52,6 @@ class RCAAgent(BaseAgent):
         ]
         top_receivers = await db.messages.aggregate(receiver_pipeline).to_list(length=5)
 
-        # Top affected groups
         group_pipeline = [
             {"$match": {
                 "delivery_status": {"$in": ["failed", "queued"]},
@@ -67,7 +64,6 @@ class RCAAgent(BaseAgent):
         ]
         top_groups = await db.messages.aggregate(group_pipeline).to_list(length=5)
 
-        # Total counts
         total_failed = sum(s["count"] for s in status_stats)
         total_escalated = sum(s.get("escalated_count", 0) for s in status_stats)
         total_msgs = await db.messages.count_documents({"timestamp": {"$gte": since}})
@@ -87,7 +83,6 @@ class RCAAgent(BaseAgent):
                 "top_affected_groups": [],
             }
 
-        # ── Resolve receiver IDs → display names ─────────────────────────────
         receiver_ids = [r["_id"] for r in top_receivers if r.get("_id")]
         group_ids    = [g["_id"] for g in top_groups    if g.get("_id")]
         name_map: Dict[str, str] = {}
@@ -124,7 +119,6 @@ class RCAAgent(BaseAgent):
             for g in top_groups
         ]
 
-        # ── Gemini RCA prompt ─────────────────────────────────────────────────
         stats_text = "\n".join(
             f"- Status '{s['_id']}': {s['count']} messages, avg {s.get('avg_retry_count', 0):.1f} retries, "
             f"{s.get('escalated_count', 0)} escalated"

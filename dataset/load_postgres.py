@@ -1,11 +1,22 @@
 """Load users, groups, group_members from JSON into Neon PostgreSQL."""
 import asyncio
 import json
+import os
+import sys
+from datetime import date, datetime
 from pathlib import Path
-from datetime import datetime, date
+
 import asyncpg
 from dotenv import load_dotenv
-import os
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+load_dotenv()
+
+from src.common.logger import configure_logging, get_logger
+configure_logging("INFO")
+logger = get_logger(__name__)
+
+DATA_DIR = Path(__file__).parent
 
 
 def _parse_dt(val):
@@ -23,59 +34,43 @@ def _parse_date(val):
         return val
     return date.fromisoformat(val[:10])
 
-load_dotenv()
-DATA_DIR = Path(__file__).parent
-
 
 async def load_data():
     url = os.getenv("NEON_DATABASE_URL", "").replace("postgresql+asyncpg://", "postgresql://")
     if not url:
-        print("ERROR: NEON_DATABASE_URL not set in .env")
+        logger.error("missing_env", var="NEON_DATABASE_URL")
         return
 
     pool = await asyncpg.create_pool(url, min_size=2, max_size=10)
-    print("Connected to PostgreSQL")
+    logger.info("postgres_connected")
 
     async with pool.acquire() as conn:
         await conn.execute("""
             CREATE TABLE IF NOT EXISTS users (
-                user_id UUID PRIMARY KEY,
-                email VARCHAR(255) UNIQUE NOT NULL,
-                display_name VARCHAR(255) NOT NULL,
-                password_hash VARCHAR(255) NOT NULL,
-                user_presence VARCHAR(50) DEFAULT 'offline',
-                last_seen TIMESTAMPTZ,
-                status VARCHAR(50) DEFAULT 'active',
-                registration_date DATE,
+                user_id UUID PRIMARY KEY, email VARCHAR(255) UNIQUE NOT NULL,
+                display_name VARCHAR(255) NOT NULL, password_hash VARCHAR(255) NOT NULL,
+                user_presence VARCHAR(50) DEFAULT 'offline', last_seen TIMESTAMPTZ,
+                status VARCHAR(50) DEFAULT 'active', registration_date DATE,
                 timezone VARCHAR(100) DEFAULT 'Asia/Kolkata',
-                language_preference VARCHAR(10) DEFAULT 'en',
-                avatar_url TEXT,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
+                language_preference VARCHAR(10) DEFAULT 'en', avatar_url TEXT,
+                created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
             );
             CREATE TABLE IF NOT EXISTS groups (
-                group_id UUID PRIMARY KEY,
-                group_name VARCHAR(255) NOT NULL,
-                description TEXT,
-                avatar_url TEXT,
-                created_by UUID,
+                group_id UUID PRIMARY KEY, group_name VARCHAR(255) NOT NULL,
+                description TEXT, avatar_url TEXT, created_by UUID,
                 max_participants INTEGER DEFAULT 100,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                updated_at TIMESTAMPTZ DEFAULT NOW()
+                created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
             );
             CREATE TABLE IF NOT EXISTS group_members (
-                id SERIAL PRIMARY KEY,
-                group_id UUID,
-                user_id UUID,
-                role VARCHAR(50) DEFAULT 'member',
-                joined_at TIMESTAMPTZ DEFAULT NOW(),
+                id SERIAL PRIMARY KEY, group_id UUID, user_id UUID,
+                role VARCHAR(50) DEFAULT 'member', joined_at TIMESTAMPTZ DEFAULT NOW(),
                 UNIQUE(group_id, user_id)
             );
         """)
-        print("Tables ensured")
+        logger.info("tables_ensured")
 
     users = json.loads((DATA_DIR / "users.json").read_text(encoding="utf-8"))
-    print(f"Loading {len(users)} users...")
+    logger.info("loading_users", count=len(users))
     async with pool.acquire() as conn:
         for u in users:
             try:
@@ -89,12 +84,12 @@ async def load_data():
                     u["user_presence"], _parse_dt(u.get("last_seen")), u["status"],
                     _parse_date(u.get("registration_date")), u["timezone"], u["language_preference"],
                 )
-            except Exception as e:
-                print(f"  User error ({u['email']}): {e}")
-    print(f"  Users loaded")
+            except Exception as exc:
+                logger.warning("user_insert_error", email=u["email"], error=str(exc))
+    logger.info("users_loaded")
 
     groups = json.loads((DATA_DIR / "groups.json").read_text(encoding="utf-8"))
-    print(f"Loading {len(groups)} groups...")
+    logger.info("loading_groups", count=len(groups))
     async with pool.acquire() as conn:
         for g in groups:
             try:
@@ -104,12 +99,12 @@ async def load_data():
                     g["group_id"], g["group_name"], g.get("description"),
                     g["created_by"], g.get("max_participants", 100),
                 )
-            except Exception as e:
-                print(f"  Group error: {e}")
-    print(f"  Groups loaded")
+            except Exception as exc:
+                logger.warning("group_insert_error", error=str(exc))
+    logger.info("groups_loaded")
 
     members = json.loads((DATA_DIR / "group_members.json").read_text(encoding="utf-8"))
-    print(f"Loading {len(members)} group memberships...")
+    logger.info("loading_members", count=len(members))
     async with pool.acquire() as conn:
         for m in members:
             try:
@@ -118,12 +113,12 @@ async def load_data():
                        VALUES ($1,$2,$3) ON CONFLICT (group_id, user_id) DO NOTHING""",
                     m["group_id"], m["user_id"], m.get("role", "member"),
                 )
-            except Exception as e:
+            except Exception:
                 pass
-    print(f"  Members loaded")
+    logger.info("members_loaded")
 
     await pool.close()
-    print("PostgreSQL loading complete!")
+    logger.info("postgres_load_complete")
 
 
 if __name__ == "__main__":
