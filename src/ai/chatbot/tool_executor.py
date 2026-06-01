@@ -24,6 +24,7 @@ from src.ai.chatbot.tool_handlers_search import (
     list_shared_documents as _list_shared_documents,
     catchup_for_group as _catchup_for_group,
 )
+from src.ai.chatbot.tool_executor_multilingual import execute_multilingual_tool as _exec_ml
 from src.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -72,6 +73,9 @@ async def execute_tool(tool_name: str, args: Dict, session) -> Any:
             return await _extract_meetings(args)
         if tool_name == "catchup_for_group":
             return await _catchup_for_group(args, session)
+        ml = await _exec_ml(tool_name, args, session)
+        if ml is not None:
+            return ml
     except Exception as exc:
         logger.error("tool_execution_failed", tool=tool_name, error=str(exc))
         return {"error": str(exc)}

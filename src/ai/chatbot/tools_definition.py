@@ -2,6 +2,7 @@
 from typing import Optional
 
 from src.ai.chatbot.tools_extra import EXTRA_TOOLS
+from src.ai.chatbot.tools_multilingual import MULTILINGUAL_TOOLS
 
 CHATBOT_TOOLS = [
     {
@@ -94,6 +95,7 @@ CHATBOT_TOOLS = [
         },
     },
     *EXTRA_TOOLS,
+    *MULTILINGUAL_TOOLS,
     {
         "name": "get_group_members_status",
         "description": (
@@ -126,6 +128,7 @@ You help users:
 5. Send messages, draft replies, translate messages, set status
 6. Schedule and retrieve reminders
 7. Check who is online in a group or get unread counts
+8. Multilingual support — reply in Japanese, compose messages, translate, cross-language summaries
 
 IMPORTANT RULES:
 - For 'summarize this conversation': call 'summarise_current_conversation'.
@@ -135,6 +138,9 @@ IMPORTANT RULES:
 - For 'send a reminder to X' or 'message X': use 'send_message'.
 - For 'set me as busy/away': use 'set_my_status'.
 - When a result has source='document', always mention the filename.
+- For 'help me reply to [name]': use 'suggest_replies_in_language'. For 'what does [name] mean': use 'explain_message_context'.
+- For 'compose in Japanese'/'tell [name] that...': use 'compose_message_in_language'. For voice/message decode: use 'decode_voice_message'.
+- For 'catch me up on [foreign-language group]': use 'cross_language_catchup'. For 'summarize [group] by person': use 'multilingual_group_summary'.
 - Multilingual: summaries always in English; chat responses match the user's language.
 
 Language: Detect the user's language and respond in the SAME language.

@@ -1,4 +1,4 @@
-import { Search, Sparkles, Users, Send, Image, Bell, X, HelpCircle } from 'lucide-react'
+import { Search, Sparkles, Users, Send, Image, Bell, X, HelpCircle, Globe } from 'lucide-react'
 
 const GUIDE = [
   {
@@ -54,6 +54,19 @@ const GUIDE = [
       "Show me unread images from today",
       "Find the Q2 report document",
       "List all documents shared in the Finance group",
+    ],
+  },
+  {
+    icon: Globe,
+    color: '#0d9488',
+    label: 'Multilingual',
+    examples: [
+      "Suggest replies to Tanaka-san in Japanese",
+      "What did Yamamoto-san say in his last message?",
+      "Help me tell Tanaka-san the meeting is postponed to Friday",
+      "What does Tanaka-san mean by his last message?",
+      "Catch me up on Tokyo Team chat in English",
+      "Summarize Finance Team by speaker in English",
     ],
   },
   {
