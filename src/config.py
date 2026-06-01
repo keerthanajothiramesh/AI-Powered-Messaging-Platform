@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = "INFO"
 
     # AI
-    GEMINI_API_KEY: str = ""
+    OPENAI_API_KEY: str = ""
 
     # Databases
     NEON_DATABASE_URL: str = ""

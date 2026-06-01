@@ -36,12 +36,12 @@ async def db_health():
 @router.get("/ai")
 async def ai_health():
     try:
-        from src.ai.gemini_client import get_gemini_client
-        client = get_gemini_client()
+        from src.ai.gemini_client import get_openai_client
+        client = get_openai_client()
         status = "healthy" if client else "unavailable"
     except Exception as e:
         status = f"unhealthy: {str(e)}"
-    return {"status": "healthy" if status == "healthy" else "degraded", "gemini": status}
+    return {"status": "healthy" if status == "healthy" else "degraded", "openai": status}
 
 
 @router.get("/vector")

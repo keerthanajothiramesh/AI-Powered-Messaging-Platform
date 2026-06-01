@@ -14,7 +14,7 @@ Pluggable search strategies: BM25 keyword search, pgvector semantic search, fuse
 
 ## 4. Circuit Breaker Pattern
 **Location:** `src/ai/gemini_client.py`  
-After 3 consecutive Gemini API failures, circuit opens and all calls fall back to local stub. Resets on success.
+After 3 consecutive OpenAI API failures, circuit opens and all calls fall back to local stub. Resets on success.
 
 ## 5. Factory Pattern (Agent Creation)
 **Location:** `src/agents/orchestrator.py`  
@@ -26,7 +26,7 @@ Heavy models (fastembed/sentence-transformers, pgvector pool) loaded once at sta
 
 ## 7. RAG Pattern (Retrieval-Augmented Generation)
 **Location:** `src/ai/rag_service.py`  
-Retrieve relevant messages from MongoDB/pgvector → build context → generate with Gemini. Grounds LLM in actual chat data.
+Retrieve relevant messages from MongoDB/pgvector → build context → generate with OpenAI. Grounds LLM in actual chat data.
 
 ## 8. LLM-as-Judge Pattern
 **Location:** `src/agents/judge_agent.py`  
@@ -42,7 +42,7 @@ Combines ranked lists from BM25 and semantic search without needing to tune scor
 
 ## 11. Graceful Degradation Pattern
 **Location:** `src/ai/gemini_client.py`, `src/search/search_service.py`, `src/media/service.py`  
-- Gemini unavailable → Flan-T5 Small (local CPU) → extractive stub  
+- OpenAI unavailable → Flan-T5 Small (local CPU) → extractive stub  
 - pgvector unavailable → BM25-only search  
 - S3 unavailable → local uploads/ folder
 

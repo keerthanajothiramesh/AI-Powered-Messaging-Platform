@@ -56,14 +56,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error("vector_store_startup_failed", error=str(e))
 
-    if settings.GEMINI_API_KEY:
+    if settings.OPENAI_API_KEY:
         try:
-            from src.ai.gemini_client import init_gemini
-            init_gemini(settings.GEMINI_API_KEY)
+            from src.ai.gemini_client import init_openai
+            init_openai(settings.OPENAI_API_KEY)
         except Exception as e:
-            logger.error("gemini_startup_failed", error=str(e))
+            logger.error("openai_startup_failed", error=str(e))
     else:
-        logger.warning("gemini_skipped", reason="GEMINI_API_KEY not set")
+        logger.warning("openai_skipped", reason="OPENAI_API_KEY not set")
 
     try:
         from src.ai.pii_guard import init_pii_guard

@@ -18,7 +18,7 @@ Relevance is determined by keyword match against a curated ground truth in `test
 
 ### Summarisation Quality — LLM-as-Judge
 
-Three dimensions scored 0–10 by Gemini 2.5 Flash acting as an impartial judge:
+Three dimensions scored 0–10 by OpenAI GPT-4o-mini 2.5 Flash acting as an impartial judge:
 
 | Dimension | What it measures |
 |---|---|
@@ -58,7 +58,7 @@ Pass threshold: average score ≥ 6.0 AND keyword topic coverage ≥ 50%.
 | Chunk size (tokens) | 3,000 |
 | Chunk overlap | 3 messages |
 | Merge threshold (tokens) | 6,000 |
-| Parallel Gemini calls per batch | 5 |
+| Parallel OpenAI GPT-4o-mini calls per batch | 5 |
 | Strategy for 2-week history | hierarchical |
 
 ---
@@ -67,7 +67,7 @@ Pass threshold: average score ≥ 6.0 AND keyword topic coverage ≥ 50%.
 
 | Scenario | Expected Behavior | Verified |
 |---|---|---|
-| Gemini circuit open (3 consecutive failures) | Falls back to Flan-T5 Small on CPU | Yes — circuit_open flag triggers `local_fallback.py` |
+| OpenAI GPT-4o-mini circuit open (3 consecutive failures) | Falls back to Flan-T5 Small on CPU | Yes — circuit_open flag triggers `local_fallback.py` |
 | Flan-T5 not installed | Extractive stub (first 20 words) returned | Yes — graceful `None` pipeline check |
 | pgvector unavailable | BM25-only search via MongoDB corpus | Yes — `try/except` in `search_service.py` |
 | No messages in time window | Returns empty summary with `"No messages found"` | Yes — early return in `rag_service.py` |
@@ -89,7 +89,7 @@ python tests/evaluation/eval_suite.py --case sum1
 ```
 
 Requires:
-- `.env` with `GEMINI_API_KEY` set
+- `.env` with `OPENAI_API_KEY` set
 - Backend databases reachable (`NEON_DATABASE_URL`, `MONGODB_URL`)
 - Dataset loaded (`dataset/generate_dataset.py`, `load_postgres.py`, `load_mongo.py`, `generate_embeddings.py`)
 
@@ -98,5 +98,5 @@ Requires:
 ## Limitations
 
 - Relevance labels are keyword-based (not human-annotated); precision numbers are lower bounds.
-- Summarisation ground truth uses Gemini as both generator and judge — same model bias applies.
+- Summarisation ground truth uses OpenAI GPT-4o-mini as both generator and judge — same model bias applies.
 - Latency numbers are from a single dev machine; production numbers with connection pooling and pre-warmed models will differ.

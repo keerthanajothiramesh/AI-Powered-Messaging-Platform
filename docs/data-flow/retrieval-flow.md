@@ -48,7 +48,7 @@ sequenceDiagram
     participant PG as PostgreSQL
     participant Mongo as MongoDB
     participant Tiktoken as tiktoken (cl100k_base)
-    participant Gemini as Gemini 2.5 Flash
+    participant OpenAI as OpenAI GPT-4o-mini
     participant Judge as LLM-as-Judge
 
     Client->>API: POST /api/ai/summarise {group_id, days}
@@ -62,25 +62,25 @@ sequenceDiagram
     end
 
     par Parallel chunk summarisation (batch=5)
-        API->>Gemini: summarise chunk 1
-        API->>Gemini: summarise chunk 2
-        API->>Gemini: summarise chunk N
+        API->>OpenAI: summarise chunk 1
+        API->>OpenAI: summarise chunk 2
+        API->>OpenAI: summarise chunk N
     end
 
     alt combined summaries ≤ 6000 tokens
-        API->>Gemini: merge all chunk summaries
+        API->>OpenAI: merge all chunk summaries
     else combined summaries > 6000 tokens
-        Note over API,Gemini: Hierarchical merge — recursive sub-batching
-        API->>Gemini: merge batch 1 of chunk summaries
-        API->>Gemini: merge batch 2 of chunk summaries
-        API->>Gemini: final merge of merged summaries
+        Note over API,OpenAI: Hierarchical merge — recursive sub-batching
+        API->>OpenAI: merge batch 1 of chunk summaries
+        API->>OpenAI: merge batch 2 of chunk summaries
+        API->>OpenAI: final merge of merged summaries
     end
 
     API->>Judge: score(summary) → relevance · accuracy · completeness
     Judge-->>API: {average_score: 8.5, feedback: "..."}
 
     alt average_score < 7
-        API->>Gemini: regenerate with improvement prompt
+        API->>OpenAI: regenerate with improvement prompt
     end
 
     API-->>Client: {summary, quality_score, token_stats}
@@ -139,8 +139,8 @@ Request
   │     YES → BM25 + Semantic + RRF (hybrid, best quality)
   │     NO  → BM25 only (keyword, still useful)
   │
-  ├─► Gemini available?
-  │     YES → Gemini 2.5 Flash (full LLM quality)
+  ├─► OpenAI available?
+  │     YES → OpenAI GPT-4o-mini (full LLM quality)
   │     NO (circuit open) → Flan-T5 Small on CPU (local inference)
   │     NO (Flan-T5 unavailable) → Extractive stub (first 20 words)
   │

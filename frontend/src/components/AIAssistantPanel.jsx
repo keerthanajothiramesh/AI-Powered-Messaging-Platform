@@ -48,7 +48,7 @@ export default function AIAssistantPanel({ onClose }) {
           </div>
           <div>
             <span className="font-semibold text-white text-sm">{t('ai.assistant')}</span>
-            <p className="text-white/60 text-xs">Powered by Gemini</p>
+            <p className="text-white/60 text-xs">Powered by OpenAI</p>
           </div>
         </div>
         <button onClick={onClose} className="p-1.5 hover:bg-white/20 rounded-lg transition-all">

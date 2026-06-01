@@ -1,34 +1,32 @@
 import asyncio
+import json
 from typing import Optional, List, Dict, Any
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from src.common.logger import get_logger
 
 logger = get_logger(__name__)
 
 _client = None
-_model = None
+_MODEL = "gpt-4o-mini"
 
 
-def init_gemini(api_key: str) -> None:
-    global _client, _model
+def init_openai(api_key: str) -> None:
+    global _client
     try:
-        import google.generativeai as genai
-        genai.configure(api_key=api_key)
-        _model = genai.GenerativeModel("gemini-2.5-flash")
-        _client = genai
-        logger.info("gemini_initialized", model="gemini-2.5-flash")
+        from openai import AsyncOpenAI
+        _client = AsyncOpenAI(api_key=api_key)
+        logger.info("openai_initialized", model=_MODEL)
     except Exception as e:
-        logger.error("gemini_init_failed", error=str(e))
+        logger.error("openai_init_failed", error=str(e))
 
 
-def get_gemini_client():
+def get_openai_client():
     return _client
 
 
 _circuit_failures = 0
 _circuit_open = False
 _circuit_opened_at: Optional[float] = None
-_CIRCUIT_RESET_SECONDS = 30  # half-open probe after this many seconds
+_CIRCUIT_RESET_SECONDS = 30
 
 
 def _record_failure():
@@ -38,7 +36,7 @@ def _record_failure():
         if not _circuit_open:
             _circuit_open = True
             _circuit_opened_at = asyncio.get_event_loop().time()
-            logger.warning("gemini_circuit_open")
+            logger.warning("openai_circuit_open")
 
 
 def _record_success():
@@ -49,7 +47,6 @@ def _record_success():
 
 
 def _is_circuit_open() -> bool:
-    """Returns True only if circuit is open AND the reset window hasn't elapsed."""
     global _circuit_open, _circuit_opened_at, _circuit_failures
     if not _circuit_open:
         return False
@@ -58,10 +55,9 @@ def _is_circuit_open() -> bool:
     except Exception:
         elapsed = 0
     if elapsed >= _CIRCUIT_RESET_SECONDS:
-        # Half-open: allow one probe attempt
         _circuit_open = False
         _circuit_failures = 0
-        logger.info("gemini_circuit_half_open", elapsed=round(elapsed))
+        logger.info("openai_circuit_half_open", elapsed=round(elapsed))
         return False
     return True
 
@@ -73,25 +69,28 @@ async def generate_text(
     temperature: float = 0.7,
 ) -> str:
     if _is_circuit_open():
-        logger.warning("gemini_circuit_open_fallback")
+        logger.warning("openai_circuit_open_fallback")
         return await _local_fallback(prompt)
 
-    if not _model:
+    if not _client:
         return await _local_fallback(prompt)
 
     try:
-        full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
-        response = await asyncio.get_event_loop().run_in_executor(
-            None,
-            lambda: _model.generate_content(
-                full_prompt,
-                generation_config={"max_output_tokens": max_tokens, "temperature": temperature},
-            ),
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        response = await _client.chat.completions.create(
+            model=_MODEL,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
         )
         _record_success()
-        return response.text
+        return response.choices[0].message.content or ""
     except Exception as e:
-        logger.error("gemini_generate_failed", error=str(e))
+        logger.error("openai_generate_failed", error=str(e))
         _record_failure()
         return await _local_fallback(prompt)
 
@@ -102,66 +101,50 @@ async def generate_with_tools(
     conversation_history: Optional[List[Dict]] = None,
     system_prompt: Optional[str] = None,
 ) -> Dict[str, Any]:
-    if not _model or _is_circuit_open():
+    if not _client or _is_circuit_open():
         return {"text": await _local_fallback(prompt), "tool_calls": []}
 
     try:
-        import google.generativeai as genai
-
-        tool_defs = []
-        for tool in tools:
-            tool_defs.append(
-                genai.protos.Tool(
-                    function_declarations=[
-                        genai.protos.FunctionDeclaration(
-                            name=tool["name"],
-                            description=tool["description"],
-                            parameters=genai.protos.Schema(
-                                type=genai.protos.Type.OBJECT,
-                                properties={
-                                    k: genai.protos.Schema(
-                                        type=genai.protos.Type.STRING,
-                                        description=v.get("description", ""),
-                                    )
-                                    for k, v in tool.get("parameters", {}).get("properties", {}).items()
-                                },
-                                required=tool.get("parameters", {}).get("required", []),
-                            ),
-                        )
-                    ]
-                )
-            )
-
-        model_with_tools = genai.GenerativeModel(
-            "gemini-2.5-flash",
-            tools=tool_defs,
-            system_instruction=system_prompt if system_prompt else None,
-        )
-        history = []
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
         if conversation_history:
             for msg in conversation_history:
-                history.append({"role": msg["role"], "parts": [msg["content"]]})
+                messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": prompt})
 
-        chat = model_with_tools.start_chat(history=history)
-        response = await asyncio.get_event_loop().run_in_executor(
-            None, lambda: chat.send_message(prompt)
+        openai_tools = [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool["name"],
+                    "description": tool["description"],
+                    "parameters": tool.get("parameters", {"type": "object", "properties": {}}),
+                },
+            }
+            for tool in tools
+        ]
+
+        response = await _client.chat.completions.create(
+            model=_MODEL,
+            messages=messages,
+            tools=openai_tools if openai_tools else None,
         )
         _record_success()
 
+        msg = response.choices[0].message
         tool_calls = []
-        text_parts = []
-        for part in response.parts:
-            if hasattr(part, "function_call") and part.function_call:
-                tool_calls.append({
-                    "name": part.function_call.name,
-                    "args": dict(part.function_call.args),
-                })
-            if hasattr(part, "text") and part.text:
-                text_parts.append(part.text)
+        if msg.tool_calls:
+            for tc in msg.tool_calls:
+                try:
+                    args = json.loads(tc.function.arguments)
+                except Exception:
+                    args = {}
+                tool_calls.append({"name": tc.function.name, "args": args})
 
-        return {"text": " ".join(text_parts), "tool_calls": tool_calls}
+        return {"text": msg.content or "", "tool_calls": tool_calls}
     except Exception as e:
-        logger.error("gemini_tool_call_failed", error=str(e))
+        logger.error("openai_tool_call_failed", error=str(e))
         _record_failure()
         return {"text": await _local_fallback(prompt), "tool_calls": []}
 

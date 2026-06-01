@@ -162,7 +162,7 @@ export default function GlobalBotDrawer({ onClose }) {
             <p className="text-sm font-bold text-indigo-700 truncate">
               {thread?.name || 'Global AI Assistant'}
             </p>
-            <p className="text-xs text-slate-400">Powered by Gemini ✨ · global context</p>
+            <p className="text-xs text-slate-400">Powered by OpenAI ✨ · global context</p>
           </div>
           <div className="flex items-center gap-1">
             <button

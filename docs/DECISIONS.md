@@ -20,13 +20,13 @@
 
 ---
 
-## ADR-003: Gemini API (vs OpenAI)
+## ADR-003: OpenAI API (GPT-4o-mini)
 
 **Status:** Accepted  
 **Context:** Need LLM for summarisation, chatbot, and agent orchestration.  
-**Decision:** Use Google Gemini 1.5 Flash via google-generativeai SDK.  
-**Rationale:** Generous context window (1M tokens); strong multilingual support (EN + JA); competitive pricing; native function calling support.  
-**Trade-offs:** GPT-4 has broader ecosystem; Gemini has less community tooling.
+**Decision:** Use OpenAI GPT-4o-mini via the openai SDK.  
+**Rationale:** Broad ecosystem and community tooling; strong multilingual support; native function/tool calling; reliable availability and quota management.  
+**Trade-offs:** Paid tier required for sustained usage; no free local fallback model from OpenAI (Flan-T5 stub used as degraded fallback).
 
 ---
 

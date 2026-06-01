@@ -14,9 +14,9 @@ Maps every requirement from `Project_Requirements_AI-Powered_Messaging_Platform.
 | Online/offline status and last-seen visibility | Done | `src/messaging/websocket_manager.py` — presence tracking per connection |
 | Offline message queueing (up to 30 days, deliver on reconnect) | Done | MongoDB TTL index (30 days); queue flush on WebSocket reconnect in `src/messaging/websocket_manager.py` |
 | AI semantic search across conversations and media metadata | Done | `src/search/search_service.py` — pgvector cosine similarity (`embedding <=> $1`) |
-| RAG-enabled conversational assistant | Done | `src/ai/rag_service.py` — chunk → parallel Gemini → hierarchical merge |
+| RAG-enabled conversational assistant | Done | `src/ai/rag_service.py` — chunk → parallel OpenAI GPT-4o-mini → hierarchical merge |
 | Hybrid search (keyword + semantic) | Done | `src/search/search_service.py` — BM25 + pgvector + Reciprocal Rank Fusion |
-| Tool-calling support for conversation retrieval and media lookup | Done | `src/ai/chatbot_service.py` — Gemini native function calling with tool registry |
+| Tool-calling support for conversation retrieval and media lookup | Done | `src/ai/chatbot_service.py` — OpenAI GPT-4o-mini native function calling with tool registry |
 | Memory and session management for contextual continuity | Done | Multi-turn session state in `src/ai/chatbot_service.py` |
 | Notifications for messages and user activity | Done | `src/notifications/service.py`, `src/notifications/router.py` |
 | Input validation guardrails and basic content moderation | Done | `src/ai/pii_guard.py` (PII scrubbing); `src/agents/moderation_agent.py` (content moderation) |
@@ -30,7 +30,7 @@ Maps every requirement from `Project_Requirements_AI-Powered_Messaging_Platform.
 |---|---|---|
 | Multi-agent orchestration (moderation, summarisation, search, delivery) | Done | `src/agents/orchestrator.py`, `src/agents/graph.py` — LangGraph state machine |
 | Context-aware summarisation with token optimisation | Done | `src/ai/rag_service.py` — tiktoken chunking (3,000 tokens), parallel batch=5, hierarchical merge at 6,000 tokens |
-| LLM-as-Judge for validating summaries and responses | Done | `src/agents/judge_agent.py` — Gemini scores relevance / accuracy / completeness 0–10 |
+| LLM-as-Judge for validating summaries and responses | Done | `src/agents/judge_agent.py` — OpenAI GPT-4o-mini scores relevance / accuracy / completeness 0–10 |
 | Evaluation framework (custom metrics: delivery latency, retrieval relevance) | Done | `tests/evaluation/eval_suite.py` — Precision@5, NDCG@5, LLM-as-Judge; results in `docs/EVALUATION_RESULTS.md` |
 | Agent-to-agent communication for distributed synchronisation | Done | LangGraph edges pass `AgentState` between search → judge → summarise → delivery agents |
 | Root cause analysis for failed deliveries | Done | `src/agents/delivery_agent.py` — analyses failure reason, escalates on `retry_count > 3` |

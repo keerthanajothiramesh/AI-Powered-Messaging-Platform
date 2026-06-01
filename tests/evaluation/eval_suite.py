@@ -218,11 +218,11 @@ def print_report(search_results: list, summ_results: list) -> None:
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 async def main(args) -> dict:
-    from src.ai.gemini_client import init_gemini
+    from src.ai.gemini_client import init_openai
     from src.config import settings
 
-    if settings.GEMINI_API_KEY:
-        init_gemini(settings.GEMINI_API_KEY)
+    if settings.OPENAI_API_KEY:
+        init_openai(settings.OPENAI_API_KEY)
 
     gt = _load_ground_truth()
     search_cases = gt["search"]

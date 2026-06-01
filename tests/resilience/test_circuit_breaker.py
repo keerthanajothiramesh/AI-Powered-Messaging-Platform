@@ -5,9 +5,9 @@ Run:
     pytest tests/resilience/ -v
 
 What is tested:
-    - Gemini circuit breaker opens after 3 consecutive failures
+    - OpenAI circuit breaker opens after 3 consecutive failures
     - Circuit breaker resets to closed on success
-    - Open circuit returns a fallback string without calling Gemini
+    - Open circuit returns a fallback string without calling OpenAI
     - DeliveryAgent returns zeros when no failed messages exist
     - DeliveryAgent does not raise when MongoDB is unavailable
     - NotificationAgent suppresses low-priority during notification fatigue
@@ -22,12 +22,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 # ── Circuit breaker ────────────────────────────────────────────────────────────
 # gemini_client.py uses module-level globals:
-#   _circuit_failures (int)  — incremented on each Gemini error
+#   _circuit_failures (int)  — incremented on each OpenAI error
 #   _circuit_open     (bool) — True once _circuit_failures >= 3
 #   _record_failure() — increments count, flips flag at threshold
 #   _record_success() — resets both to 0 / False
 
-class TestGeminiCircuitBreaker:
+class TestOpenAICircuitBreaker:
 
     def setup_method(self):
         """Reset circuit state before each test."""
@@ -62,12 +62,12 @@ class TestGeminiCircuitBreaker:
         assert gcm._circuit_failures == 0
 
     async def test_open_circuit_returns_fallback_without_calling_gemini(self):
-        """When the circuit is open, generate_text must not call Gemini."""
+        """When the circuit is open, generate_text must not call OpenAI."""
         import src.ai.gemini_client as gcm
         gcm._circuit_open = True
 
         with patch("src.ai.gemini_client._local_fallback", new_callable=AsyncMock, return_value="fallback") as mock_fb, \
-             patch("src.ai.gemini_client._model", new_callable=MagicMock):
+             patch("src.ai.gemini_client._client", new_callable=MagicMock):
             result = await gcm.generate_text("any prompt")
 
         # Fallback must have been used, and result is a string
@@ -164,7 +164,7 @@ class TestNotificationAgentFatigue:
 class TestRCAAgentHealthyState:
 
     async def test_returns_healthy_when_no_failures(self):
-        """RCAAgent reports zero failures and skips Gemini when system is healthy."""
+        """RCAAgent reports zero failures and skips OpenAI when system is healthy."""
         from src.agents.rca_agent import RCAAgent
 
         with patch("src.common.database.get_mongo_db") as mock_db, \

@@ -30,7 +30,7 @@ graph TD
 
     subgraph LLMLayer["LLM Layer"]
         CB[Circuit Breaker<br/>3 failures → open]
-        Gemini[Gemini 2.5 Flash<br/>1M context · Multilingual]
+        OpenAI[OpenAI GPT-4o-mini<br/>1M context · Multilingual]
         FlanT5[Flan-T5 Small<br/>Local CPU Fallback]
     end
 
@@ -64,7 +64,7 @@ graph TD
 
     AISvc --> CB
     AgentSvc --> CB
-    CB -->|healthy| Gemini
+    CB -->|healthy| OpenAI
     CB -->|open| FlanT5
 
     AuthSvc --> PG
@@ -86,7 +86,7 @@ graph TD
 | **Horizontal Scaling** | Single process | Stateless FastAPI pods, autoscaled via Kubernetes HPA |
 | **WebSocket Scaling** | In-memory connection map | Redis Pub/Sub fanout across pods |
 | **Vector DB** | pgvector on Neon PostgreSQL | Pinecone / Weaviate (managed, horizontally scaled) |
-| **LLM** | Single Gemini API key | Key pool + multiple model tiers (Flash for latency, Pro for quality) |
+| **LLM** | Single OpenAI API key | Key pool + multiple model tiers (Flash for latency, Pro for quality) |
 | **Message Queue** | MongoDB TTL index as offline queue | Kafka / RabbitMQ for guaranteed delivery |
 | **Secrets** | `.env` file | AWS Secrets Manager / HashiCorp Vault |
 | **Observability** | Structured logs (structlog) | Prometheus metrics + Grafana dashboard + Jaeger traces |
@@ -107,7 +107,7 @@ graph LR
     BE --> PG[(RDS PostgreSQL<br/>pgvector extension)]
     BE --> Mongo[(DocumentDB / Atlas)]
     BE --> Vec[(Pinecone<br/>Vector Store)]
-    BE --> GeminiAPI[Gemini API<br/>Key Pool]
+    BE --> OpenAIAPI[OpenAI API<br/>Key Pool]
     BE --> CM[ConfigMap<br/>App Settings]
     BE --> Secret[K8s Secrets<br/>API Keys)]
 ```
@@ -123,5 +123,5 @@ graph LR
 | Strategy | `search_service.py` | Pluggable BM25 / Semantic / RRF strategies |
 | Observer | `websocket_manager.py` | Event-driven real-time message delivery |
 | LLM-as-Judge | `judge_agent.py` | Automated quality gate for AI outputs |
-| Singleton | Model loaders | `init_embedding_service()`, `init_gemini()` called once at startup |
-| Graceful Degradation | Multiple layers | BM25 if vector fails · Flan-T5 if Gemini fails · stub if Flan-T5 fails |
+| Singleton | Model loaders | `init_embedding_service()`, `init_openai()` called once at startup |
+| Graceful Degradation | Multiple layers | BM25 if vector fails · Flan-T5 if OpenAI fails · stub if Flan-T5 fails |

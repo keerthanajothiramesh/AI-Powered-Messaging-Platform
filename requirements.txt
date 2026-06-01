@@ -18,9 +18,9 @@ pgvector>=0.3.0
 fastembed>=0.3.6
 
 # AI / LLM
-google-generativeai==0.8.3
+openai>=1.50.0
 langchain==0.3.7
-langchain-google-genai==2.0.7
+langchain-openai>=0.2.0
 langgraph==0.2.55
 rank-bm25==0.2.2
 tiktoken==0.8.0

@@ -17,7 +17,7 @@ A production-grade POC of an AI-powered real-time messaging platform with semant
        │              │              │
  ┌─────▼──────┐ ┌─────▼──────┐ ┌───▼────────────────┐
  │   Neon     │ │  MongoDB   │ │  pgvector on Neon  │
- │ PostgreSQL │ │   Atlas    │ │  + Gemini API      │
+ │ PostgreSQL │ │   Atlas    │ │  + OpenAI API      │
  │ users/grps │ │  messages  │ │  + fastembed ONNX  │
  └────────────┘ └────────────┘ └────────────────────┘
 ```
@@ -28,7 +28,7 @@ A production-grade POC of an AI-powered real-time messaging platform with semant
 - Node.js 18+
 - Neon PostgreSQL account (free tier works)
 - MongoDB Atlas account (free tier works)
-- Google Gemini API key (free tier works)
+- Google OpenAI API key (free tier works)
 
 ## Installation
 
@@ -55,7 +55,7 @@ cp .env.example .env
 
 Edit `.env` and fill in:
 ```env
-GEMINI_API_KEY=your-gemini-key
+OPENAI_API_KEY=your-gemini-key
 NEON_DATABASE_URL=postgresql+asyncpg://user:pass@host/db
 MONGODB_URL=mongodb+srv://user:pass@cluster.mongodb.net/messaging
 JWT_SECRET_KEY=your-random-secret-key
@@ -184,7 +184,7 @@ Toggle language flag 🇯🇵/🇬🇧 in top right to switch UI language
 
 | Variable | Required | Description |
 |---|---|---|
-| `GEMINI_API_KEY` | Yes | Google Gemini API key |
+| `OPENAI_API_KEY` | Yes | Google OpenAI API key |
 | `NEON_DATABASE_URL` | Yes | PostgreSQL connection string |
 | `MONGODB_URL` | Yes | MongoDB Atlas connection string |
 | `JWT_SECRET_KEY` | Yes | Random secret for JWT signing |

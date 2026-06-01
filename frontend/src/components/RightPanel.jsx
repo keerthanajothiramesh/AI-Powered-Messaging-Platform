@@ -678,7 +678,7 @@ function InlineAIChat({ convId, convName, isGroup, otherUserId }) {
           <p className="text-xs font-bold text-indigo-700 leading-tight truncate">
             {activeThread?.name || 'AI Assistant'}
           </p>
-          <p className="text-xs text-slate-400 leading-tight">Powered by Gemini ✨</p>
+          <p className="text-xs text-slate-400 leading-tight">Powered by OpenAI ✨</p>
         </div>
         <div className="flex gap-0.5 flex-shrink-0">
           <button onClick={() => setShowThreads(v => !v)}

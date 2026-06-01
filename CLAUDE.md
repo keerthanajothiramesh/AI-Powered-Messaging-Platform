@@ -4,7 +4,7 @@
 A full-stack AI-powered messaging platform POC featuring:
 - Real-time 1:1 and group messaging via WebSocket
 - AI semantic search with hybrid BM25 + pgvector retrieval
-- RAG-enabled conversation summarisation using Gemini 1.5 Flash
+- RAG-enabled conversation summarisation using OpenAI GPT-4o-mini
 - Multi-agent orchestration (Search, Summarisation, Moderation, Notification, Delivery)
 - LLM-as-Judge quality validation for summaries
 - Multi-language support (English + Japanese)
@@ -14,7 +14,7 @@ A full-stack AI-powered messaging platform POC featuring:
 ## Key Technical Decisions
 1. **Polyglot persistence**: Neon PostgreSQL + pgvector (users/groups/embeddings) + MongoDB Atlas (messages/events)
 2. **Hybrid search**: BM25 + semantic via Reciprocal Rank Fusion — better precision than pure semantic
-3. **Gemini 1.5 Flash**: Chosen for 1M context window, multilingual support, native function calling
+3. **OpenAI GPT-4o-mini**: Chosen for 1M context window, multilingual support, native function calling
 4. **WebSocket**: Full-duplex for <500ms delivery; offline queue via MongoDB TTL index (30 days)
 5. **Circuit breaker**: 3 failures → open circuit → fallback to local stub
 6. **LangGraph agents**: Intent-routed orchestration with specialized agents
@@ -35,7 +35,7 @@ FastAPI Backend (Python 3.12)
     Neon PostgreSQL (users, groups)
     MongoDB Atlas (messages, media, events)
     Neon PostgreSQL pgvector (embeddings)
-    Gemini API (LLM)
+    OpenAI API (LLM)
 ```
 
 ## Key Components
@@ -45,7 +45,7 @@ FastAPI Backend (Python 3.12)
 | WebSocket Manager | `src/messaging/websocket_manager.py` | Real-time presence + message delivery |
 | Embedding Service | `src/ai/embedding_service.py` | sentence-transformers all-MiniLM-L6-v2 |
 | Vector Store | `src/ai/vector_store.py` | pgvector operations (cosine similarity via `<=>`) |
-| Gemini Client | `src/ai/gemini_client.py` | LLM with circuit breaker |
+| OpenAI Client | `src/ai/gemini_client.py` | LLM with circuit breaker |
 | RAG Service | `src/ai/rag_service.py` | Summarisation + catch-up |
 | Hybrid Search | `src/search/search_service.py` | BM25 + semantic + RRF |
 | Chatbot | `src/ai/chatbot_service.py` | Multi-turn with tool calling |
@@ -56,7 +56,7 @@ FastAPI Backend (Python 3.12)
 - Repository Pattern (data access abstraction)
 - Observer Pattern (WebSocket event distribution)
 - Strategy Pattern (pluggable search strategies)
-- Circuit Breaker Pattern (Gemini API resilience)
+- Circuit Breaker Pattern (OpenAI API resilience)
 - Factory Pattern (agent creation)
 - Singleton Pattern (model loading)
 - RAG Pattern (retrieval-augmented generation)
@@ -74,7 +74,7 @@ FastAPI Backend (Python 3.12)
 ## Known Limitations (POC vs Production)
 - WebSocket horizontal scaling needs Redis pub/sub (currently in-memory)
 - pgvector on Neon free tier — needs Pinecone/Weaviate for 100M+ vector production scale
-- Single Gemini model — production needs load balancing across API keys
+- Single OpenAI API key — production needs load balancing across API keys
 - No E2E encryption implemented (architecture noted, not built in POC)
 - BM25 corpus loaded from MongoDB on search — needs caching layer for production
 
