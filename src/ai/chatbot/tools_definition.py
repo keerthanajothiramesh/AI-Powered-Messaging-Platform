@@ -1,6 +1,8 @@
 """Chatbot tool schemas exposed to the LLM via function calling."""
 from typing import Optional
 
+from src.ai.chatbot.tools_extra import EXTRA_TOOLS
+
 CHATBOT_TOOLS = [
     {
         "name": "summarise_current_conversation",
@@ -91,6 +93,7 @@ CHATBOT_TOOLS = [
             "required": ["recipient_name", "message"],
         },
     },
+    *EXTRA_TOOLS,
     {
         "name": "get_group_members_status",
         "description": (
@@ -116,17 +119,23 @@ def build_system_prompt(is_group: bool, conv_name: str) -> str:
     return f"""You are an intelligent messaging assistant for an AI-powered chat platform.{ctx}
 
 You help users:
-1. Find specific messages using semantic search
-2. Summarise conversations and group discussions
-3. Answer questions about chat history
-4. Answer questions from uploaded documents, PDFs, reports, and shared files
-5. Look up media files and attachments
+1. Find specific messages using semantic or time-based search
+2. Summarise conversations — current, specific group, or targeted time window
+3. Answer questions from chat history and uploaded documents/files
+4. Look up media, action items, meetings, and team activity stats
+5. Send messages, draft replies, translate messages, set status
+6. Schedule and retrieve reminders
+7. Check who is online in a group or get unread counts
 
 IMPORTANT RULES:
-- When the user asks to 'summarize', always call 'summarise_current_conversation' immediately.
-- For questions about specific messages OR documents, always use 'search_messages' first.
-- When a result has source='document', mention the filename.
-- Multilingual: always output summaries in English even if source messages are in another language.
+- For 'summarize this conversation': call 'summarise_current_conversation'.
+- For 'what happened in [group] since [time]': call 'catchup_for_group'.
+- For 'what did I miss while offline': call 'summarise_current_conversation' (overall) or 'catchup_for_group' (specific group).
+- For specific message lookup: use 'search_messages'. For time-filtered: use 'search_messages_by_time'.
+- For 'send a reminder to X' or 'message X': use 'send_message'.
+- For 'set me as busy/away': use 'set_my_status'.
+- When a result has source='document', always mention the filename.
+- Multilingual: summaries always in English; chat responses match the user's language.
 
 Language: Detect the user's language and respond in the SAME language.
 Be concise, helpful, and friendly."""

@@ -6,6 +6,24 @@ from src.ai.chatbot.tool_executor_extras import (
     send_message as _send_message_impl,
     get_group_members_status as _get_group_members_status_impl,
 )
+from src.ai.chatbot.tool_handlers_info import (
+    get_my_action_items as _get_my_action_items,
+    get_group_activity_stats as _get_group_activity_stats,
+    get_unread_count as _get_unread_count,
+    extract_meetings as _extract_meetings,
+)
+from src.ai.chatbot.tool_handlers_compose import (
+    draft_reply as _draft_reply,
+    translate_message as _translate_message,
+    set_my_status as _set_my_status,
+    schedule_reminder as _schedule_reminder,
+    get_reminders as _get_reminders,
+)
+from src.ai.chatbot.tool_handlers_search import (
+    search_messages_by_time as _search_messages_by_time,
+    list_shared_documents as _list_shared_documents,
+    catchup_for_group as _catchup_for_group,
+)
 from src.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -30,6 +48,30 @@ async def execute_tool(tool_name: str, args: Dict, session) -> Any:
             return await _send_message_impl(args, session)
         if tool_name == "get_group_members_status":
             return await _get_group_members_status_impl(args)
+        if tool_name == "get_my_action_items":
+            return await _get_my_action_items(args, session)
+        if tool_name == "get_group_activity_stats":
+            return await _get_group_activity_stats(args)
+        if tool_name == "set_my_status":
+            return await _set_my_status(args, session)
+        if tool_name == "get_unread_count":
+            return await _get_unread_count(session)
+        if tool_name == "draft_reply":
+            return await _draft_reply(args)
+        if tool_name == "search_messages_by_time":
+            return await _search_messages_by_time(args, session)
+        if tool_name == "list_shared_documents":
+            return await _list_shared_documents(args)
+        if tool_name == "translate_message":
+            return await _translate_message(args)
+        if tool_name == "schedule_reminder":
+            return await _schedule_reminder(args, session)
+        if tool_name == "get_reminders":
+            return await _get_reminders(session)
+        if tool_name == "extract_meetings":
+            return await _extract_meetings(args)
+        if tool_name == "catchup_for_group":
+            return await _catchup_for_group(args, session)
     except Exception as exc:
         logger.error("tool_execution_failed", tool=tool_name, error=str(exc))
         return {"error": str(exc)}
