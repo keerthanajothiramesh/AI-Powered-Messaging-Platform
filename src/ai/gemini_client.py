@@ -110,7 +110,8 @@ async def generate_with_tools(
             messages.append({"role": "system", "content": system_prompt})
         if conversation_history:
             for msg in conversation_history:
-                messages.append({"role": msg["role"], "content": msg["content"]})
+                role = "assistant" if msg["role"] == "model" else msg["role"]
+                messages.append({"role": role, "content": msg["content"]})
         messages.append({"role": "user", "content": prompt})
 
         openai_tools = [

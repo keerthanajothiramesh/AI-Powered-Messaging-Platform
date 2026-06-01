@@ -209,7 +209,7 @@ class ChatbotSession:
                     max_tokens=512,
                 )
 
-        self.history.append({"role": "model", "content": final_text})
+        self.history.append({"role": "assistant", "content": final_text})
 
         # Async judge on tool-enriched responses (fire-and-forget, never blocks the reply)
         if tool_results and final_text:
