@@ -42,7 +42,7 @@ export default function DashboardPage() {
   const [catchUpLoading, setCatchUpLoading] = useState(true)
 
   useEffect(() => {
-    client.post('/ai/catchup', { hours_offline: 24 })
+    client.post('/ai/catchup', { hours_offline: 72 })
       .then((r) => setCatchUpData(r.data))
       .catch(() => {})
       .finally(() => setCatchUpLoading(false))
