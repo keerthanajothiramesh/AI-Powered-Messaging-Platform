@@ -62,6 +62,7 @@ FastAPI Backend (Python 3.12)
 - RAG Pattern (retrieval-augmented generation)
 - LLM-as-Judge Pattern (quality validation)
 - Reciprocal Rank Fusion (result merging)
+- Two-layer Guardrails: regex (prompt injection) + OpenAI Moderation API (harmful content)
 - Graceful Degradation (multi-level fallbacks)
 
 ## Demo Talking Points

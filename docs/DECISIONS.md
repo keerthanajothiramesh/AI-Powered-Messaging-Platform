@@ -67,3 +67,17 @@
 **Decision:** FastAPI WebSocket with ConnectionManager for presence and message delivery.  
 **Rationale:** Bidirectional; persistent connection; no polling overhead; native support in FastAPI; enables typing indicators and read receipts.  
 **Trade-offs:** Connection state management complexity; horizontal scaling requires Redis pub/sub (noted as production limitation).
+
+---
+
+## ADR-008: OpenAI Moderation API for Content Guardrails (vs Regex-only)
+
+**Status:** Accepted  
+**Context:** Initial implementation used regex patterns for content moderation. Regex is brittle — it misses paraphrasing, multilingual harmful content, and context-dependent abuse.  
+**Decision:** Replace regex content moderation with OpenAI Moderation API as the primary layer. Retain regex as fallback when OpenAI is unavailable.  
+**Two-layer architecture:**
+- Layer 1 (sync, regex): Prompt injection + jailbreak patterns — `chatbot_service.py`. OpenAI Moderation API does not catch these attack patterns.
+- Layer 2 (async, API): Harmful content — hate, harassment, self-harm, sexual, violence — scored 0–1 per category. Score ≥ 0.8 → block. Score ≥ 0.5 → warn.  
+
+**Rationale:** OpenAI Moderation API is free, < 100ms, context-aware, and multilingual. Reuses the existing OpenAI API key. Returns category-level scores (not just binary flagged) enabling granular severity mapping. No additional dependency or cost.  
+**Trade-offs:** Adds one async API call per message in the agent pipeline. Mitigated by: (1) free endpoint with high rate limits, (2) regex fallback keeps the system functional when OpenAI is down.

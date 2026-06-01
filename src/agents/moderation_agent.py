@@ -1,3 +1,15 @@
+"""
+Content moderation agent.
+
+Primary:  OpenAI Moderation API — context-aware, multilingual, category scores.
+Fallback: Regex patterns — used when OpenAI client is unavailable (circuit open).
+
+Two-tier action mapping:
+  category_score >= 0.8  → block   (high confidence harmful)
+  category_score >= 0.5  → warn    (borderline — pass through with warning)
+  category_score <  0.5  → allow
+  Safety override: any score >= 0.8 always blocks regardless of category.
+"""
 import re
 from typing import Dict, Any, List, Tuple
 
@@ -6,104 +18,126 @@ from src.common.logger import get_logger
 
 logger = get_logger(__name__)
 
-TOXIC_PATTERNS = [
+# ── Regex fallback (used only when OpenAI client is unavailable) ──────────────
+_FALLBACK_PATTERNS = [
     r'\b(spam|scam|hack|phish)\b',
     r'(http[s]?://\S+){3,}',
 ]
+_FALLBACK_RE = re.compile("|".join(_FALLBACK_PATTERNS), re.IGNORECASE)
+
+# Severity threshold mapping (OpenAI score 0–1 → action)
+_BLOCK_THRESHOLD = 0.80
+_WARN_THRESHOLD  = 0.50
 
 
 class ModerationAgent(BaseAgent):
     def __init__(self):
         super().__init__(
             name="ModerationAgent",
-            system_prompt="""You are a content moderation specialist.
-Evaluate messages for:
-1. Toxicity and harmful content
-2. Spam patterns
-3. Personal information leakage
-4. Policy violations
-
-Respond in this EXACT format:
-SEVERITY: [0-10]
-RECOMMENDATION: [allow|warn|block]
-REASON: [one sentence]""",
+            system_prompt="You are a content moderation specialist.",
         )
 
     async def run(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
-        content = input_data.get("content", "")
+        content    = input_data.get("content", "")
         message_id = input_data.get("message_id", "")
 
         logger.info("moderation_agent_run", message_id=message_id)
 
-        flags = self._rule_based_check(content)
+        # ── Primary: OpenAI Moderation API ───────────────────────────────────
+        result = await _openai_moderation(content)
+        if result is not None:
+            return {**result, "agent": self.name, "message_id": message_id}
 
-        if not flags:
+        # ── Fallback: regex ───────────────────────────────────────────────────
+        logger.warning("moderation_openai_unavailable", fallback="regex")
+        return _regex_fallback(content, message_id, self.name)
+
+
+async def _openai_moderation(content: str) -> Dict[str, Any] | None:
+    """
+    Call OpenAI Moderation API. Returns a result dict or None if unavailable.
+    """
+    try:
+        from src.ai.gemini_client import get_openai_client
+        client = get_openai_client()
+        if not client:
+            return None
+
+        response = await client.moderations.create(input=content)
+        result   = response.results[0]
+
+        if not result.flagged:
             return {
-                "agent": self.name,
-                "message_id": message_id,
                 "is_flagged": False,
-                "flags": [],
-                "severity": 0,
-                "assessment": "No violations detected.",
-                "action": "allow",
+                "flags":      [],
+                "severity":   0,
+                "assessment": "OpenAI Moderation: no violations detected.",
+                "action":     "allow",
             }
 
-        # Rule matched — ask the AI to score actual severity before deciding
-        ai_prompt = (
-            f'Evaluate this message for policy violations:\n"{content}"\n\n'
-            f'Flags detected: {", ".join(flags)}\n'
-            "Is this genuinely harmful? Use the exact response format specified."
-        )
-        ai_assessment = await self._generate(ai_prompt, max_tokens=128)
-        severity, recommendation, reason = _parse_assessment(ai_assessment)
+        # Find the highest-scoring category
+        scores       = result.category_scores.model_dump()
+        top_category = max(scores, key=scores.get)
+        top_score    = scores[top_category]
+
+        # Map score → severity 0–10 and action
+        severity = round(top_score * 10)
+        if top_score >= _BLOCK_THRESHOLD:
+            action = "block"
+        elif top_score >= _WARN_THRESHOLD:
+            action = "warn"
+        else:
+            action = "allow"
+
+        flagged_cats = [k for k, v in scores.items() if v >= _WARN_THRESHOLD]
 
         logger.info(
-            "moderation_ai_result",
-            severity=severity,
-            recommendation=recommendation,
+            "moderation_openai_result",
+            top_category=top_category,
+            top_score=round(top_score, 3),
+            action=action,
         )
 
         return {
-            "agent": self.name,
-            "message_id": message_id,
             "is_flagged": True,
-            "flags": flags,
-            "severity": severity,
-            "assessment": reason,
-            "action": recommendation,   # allow | warn | block — AI-driven, not just rule-matched
+            "flags":      flagged_cats,
+            "severity":   severity,
+            "assessment": (
+                f"OpenAI Moderation: {top_category.replace('/', ' → ')} "
+                f"(score {top_score:.2f})"
+            ),
+            "action": action,
         }
 
-    def _rule_based_check(self, content: str) -> List[str]:
-        flags = []
-        content_lower = content.lower()
-        for pattern in TOXIC_PATTERNS:
-            if re.search(pattern, content_lower):
-                flags.append(f"pattern_match:{pattern[:20]}")
-        return flags
+    except Exception as exc:
+        logger.error("moderation_openai_failed", error=str(exc))
+        return None
 
 
-def _parse_assessment(response: str) -> Tuple[int, str, str]:
-    """Extract severity (0-10), recommendation (allow/warn/block), and reason."""
-    severity = 5
-    recommendation = "warn"
-    reason = response.strip()
+def _regex_fallback(content: str, message_id: str, agent_name: str) -> Dict[str, Any]:
+    """Regex-based fallback when OpenAI is unavailable."""
+    flags = []
+    for pattern in _FALLBACK_PATTERNS:
+        if re.search(pattern, content, re.IGNORECASE):
+            flags.append(f"regex:{pattern[:30]}")
 
-    for line in response.splitlines():
-        line = line.strip()
-        if line.upper().startswith("SEVERITY:"):
-            try:
-                severity = int(re.search(r"\d+", line).group())
-            except (AttributeError, ValueError):
-                pass
-        elif line.upper().startswith("RECOMMENDATION:"):
-            val = line.split(":", 1)[1].strip().lower()
-            if val in ("allow", "warn", "block"):
-                recommendation = val
-        elif line.upper().startswith("REASON:"):
-            reason = line.split(":", 1)[1].strip()
+    if not flags:
+        return {
+            "agent":      agent_name,
+            "message_id": message_id,
+            "is_flagged": False,
+            "flags":      [],
+            "severity":   0,
+            "assessment": "Regex fallback: no violations detected.",
+            "action":     "allow",
+        }
 
-    # Safety override: severity 8+ always blocks regardless of recommendation
-    if severity >= 8:
-        recommendation = "block"
-
-    return severity, recommendation, reason
+    return {
+        "agent":      agent_name,
+        "message_id": message_id,
+        "is_flagged": True,
+        "flags":      flags,
+        "severity":   6,
+        "assessment": "Regex fallback: suspicious pattern detected.",
+        "action":     "warn",
+    }

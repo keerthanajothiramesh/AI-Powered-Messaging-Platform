@@ -262,7 +262,61 @@ retry_count, final_response      # control flow
 
 ---
 
-## 8. Resilience & Graceful Degradation
+## 8. Input Guardrails & Content Moderation
+
+### 8.1 Two-Layer Architecture
+
+| Layer | Location | Mechanism | Catches |
+|---|---|---|---|
+| Layer 1 — Prompt Security | `chatbot_service.py` | Regex (sync, instant) | Prompt injection, jailbreak, XSS, SQL injection |
+| Layer 2 — Content Moderation | `moderation_agent.py` + `chatbot_service.py` | OpenAI Moderation API (async) | Hate, harassment, self-harm, sexual, violence |
+
+### 8.2 OpenAI Moderation API (Primary)
+
+```python
+response = await client.moderations.create(input=content)
+result = response.results[0]
+# result.flagged → bool
+# result.category_scores → per-category 0-1 scores
+# Categories: hate, harassment, self-harm, sexual, violence, etc.
+```
+
+**Severity mapping:**
+
+| Score | Action |
+|---|---|
+| ≥ 0.80 | block — content violates platform policy |
+| ≥ 0.50 | warn — pass through with moderation warning |
+| < 0.50 | allow |
+
+### 8.3 Regex Fallback (Prompt Injection + OpenAI unavailable)
+
+Regex patterns are retained for two purposes:
+1. **Always active** — jailbreak/prompt injection detection (OpenAI Moderation API does not catch these)
+2. **Fallback** — when OpenAI client is unavailable (circuit open), regex provides basic content filtering
+
+```
+Patterns: ignore all previous instructions, pretend you are,
+          jailbreak, DAN mode, drop table, exec(, <script>, etc.
+```
+
+### 8.4 Moderation Flow
+
+```
+User message
+    ↓
+Layer 1: Regex prompt injection check (sync, instant)
+    ├─ BLOCKED → return rejection message immediately
+    └─ PASS ↓
+Layer 2: OpenAI Moderation API (async)
+    ├─ score ≥ 0.80 → block with category explanation
+    ├─ score ≥ 0.50 → warn (proceed + flag in response)
+    └─ score < 0.50 → allow → proceed to AI response
+```
+
+---
+
+## 9. Resilience & Graceful Degradation (excluding Moderation — see §8)
 
 ### 8.1 Circuit Breaker (OpenAI)
 

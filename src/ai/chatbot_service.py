@@ -28,11 +28,41 @@ _BLOCKED_RESPONSE = (
 
 
 def _moderate_input(text: str) -> str | None:
+    """Sync check: prompt injection + jailbreak patterns (regex)."""
     if len(text) > _MAX_INPUT_LEN:
         return "Input too long."
     if _BLOCKED_RE.search(text):
-        logger.warning("moderation_blocked", snippet=text[:80])
+        logger.warning("chatbot_prompt_injection_blocked", snippet=text[:80])
         return _BLOCKED_RESPONSE
+    return None
+
+
+async def _moderate_content(text: str) -> str | None:
+    """Async check: OpenAI Moderation API for harmful content."""
+    try:
+        from src.ai.gemini_client import get_openai_client
+        client = get_openai_client()
+        if not client:
+            return None
+        response = await client.moderations.create(input=text)
+        result = response.results[0]
+        if result.flagged:
+            scores = result.category_scores.model_dump()
+            top_category = max(scores, key=scores.get)
+            top_score = scores[top_category]
+            if top_score >= 0.80:
+                logger.warning(
+                    "chatbot_content_moderation_blocked",
+                    category=top_category,
+                    score=round(top_score, 3),
+                )
+                return (
+                    "I'm unable to respond to that message as it was flagged "
+                    f"for {top_category.replace('/', ' ')}. "
+                    "Please keep conversations respectful. 🛡️"
+                )
+    except Exception as exc:
+        logger.warning("chatbot_moderation_api_failed", error=str(exc))
     return None
 
 
@@ -172,9 +202,15 @@ class ChatbotSession:
         self.history: List[Dict] = []
 
     async def chat(self, message: str) -> Dict[str, Any]:
+        # Layer 1: prompt injection / jailbreak (sync regex)
         rejection = _moderate_input(message)
         if rejection:
             return {"text": rejection, "tool_calls": [], "history_length": len(self.history)}
+
+        # Layer 2: harmful content (async OpenAI Moderation API)
+        content_rejection = await _moderate_content(message)
+        if content_rejection:
+            return {"text": content_rejection, "tool_calls": [], "history_length": len(self.history)}
 
         safe_message, detected_pii = scan_and_anonymize(message)
         if detected_pii:
