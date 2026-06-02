@@ -29,6 +29,7 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
   const [summary, setSummary] = useState(null)
   const [feedbackId, setFeedbackId] = useState(null)
   const [summaryRating, setSummaryRating] = useState(null)
+  const [summaryDays, setSummaryDays] = useState(14)
   const [actionItems, setActionItems] = useState([])
   const [checkedItems, setCheckedItems] = useState({})
   const [summarising, setSummarising] = useState(false)
@@ -72,7 +73,7 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
     setActionItems([])
     setCheckedItems({})
     try {
-      const r = await client.post('/ai/summarise', { group_id: activeConversation.id, days: 14 })
+      const r = await client.post('/ai/summarise', { group_id: activeConversation.id, days: summaryDays })
       setSummary(r.data.summary)
       setFeedbackId(r.data.feedback_id || null)
       setActionItems(r.data.action_items || [])
@@ -224,6 +225,8 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
           feedbackId={feedbackId}
           summaryRating={summaryRating}
           onRate={handleRate}
+          summaryDays={summaryDays}
+          onDaysChange={setSummaryDays}
           actionItems={actionItems}
           checkedItems={checkedItems}
           onToggleCheck={(i) => setCheckedItems(prev => ({ ...prev, [i]: !prev[i] }))}
@@ -271,7 +274,8 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
 
 function GroupPanel({
   convId, groupTab, onTabChange, members, myRole, isAdmin,
-  summary, feedbackId, summaryRating, onRate, actionItems, checkedItems, onToggleCheck, summarising, onSummary,
+  summary, feedbackId, summaryRating, onRate, summaryDays, onDaysChange,
+  actionItems, checkedItems, onToggleCheck, summarising, onSummary,
   highlights, highlightsLoading, onHighlights,
   editing, editName, editDesc, editLoading,
   onEditStart, onEditCancel, onEditNameChange, onEditDescChange, onEditSave, onDeleteGroup,
@@ -438,15 +442,29 @@ function GroupPanel({
 
       {groupTab === 'summary' && (
         <div className="flex-1 overflow-y-auto p-3 scrollbar-thin space-y-3">
-          <button
-            onClick={onSummary}
-            disabled={summarising}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-60"
-            style={{ background: 'linear-gradient(135deg, #eef2ff, #ede9fe)', color: '#6366f1' }}
-          >
-            {summarising ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-            {t('groups.aiSummary')}
-          </button>
+          <div className="flex gap-2 items-center">
+            <select
+              value={summaryDays}
+              onChange={(e) => onDaysChange(Number(e.target.value))}
+              disabled={summarising}
+              className="flex-1 px-2.5 py-2 text-xs border border-indigo-200 rounded-xl text-indigo-700 font-semibold bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-50"
+            >
+              <option value={7}>Last 7 days</option>
+              <option value={14}>Last 14 days</option>
+              <option value={30}>Last 30 days</option>
+              <option value={60}>Last 60 days</option>
+              <option value={90}>Last 90 days</option>
+            </select>
+            <button
+              onClick={onSummary}
+              disabled={summarising}
+              className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all disabled:opacity-60 flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg, #eef2ff, #ede9fe)', color: '#6366f1' }}
+            >
+              {summarising ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+              {summarising ? 'Generating…' : t('groups.aiSummary')}
+            </button>
+          </div>
 
           {summary && (
             <div
@@ -455,7 +473,7 @@ function GroupPanel({
             >
               <div className="flex items-center gap-1.5 mb-2">
                 <Sparkles size={11} className="text-indigo-500" />
-                <span className="text-xs font-bold text-indigo-600">AI Summary · Last 14 days</span>
+                <span className="text-xs font-bold text-indigo-600">AI Summary · Last {summaryDays} days</span>
               </div>
               <p className="whitespace-pre-wrap">{summary}</p>
               {feedbackId && (
