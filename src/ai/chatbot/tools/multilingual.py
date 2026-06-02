@@ -202,12 +202,29 @@ async def cross_language_catchup(args: Dict, session) -> Any:
         f"Translate any non-{out_lang} content. Be concise and actionable."
     )
     summary = await generate_text(prompt)
+
+    from src.agents.judge_agent import JudgeAgent
+    judgment = await JudgeAgent().evaluate(
+        summary, {"group_name": group["group_name"], "days": round(hours / 24, 1)}
+    )
+    if judgment.get("average_score", 10) < 7:
+        logger.warning("cross_language_catchup_quality_low",
+                       group=group["group_name"], score=judgment["average_score"])
+        refined_prompt = (
+            f"{prompt}\n\n"
+            f"Previous attempt scored {judgment['average_score']:.1f}/10. "
+            f"Issues: {judgment.get('feedback', '')}. "
+            f"Improve the summary, ensure all non-{out_lang} content is translated."
+        )
+        summary = await generate_text(refined_prompt)
+
     return {
         "group": group["group_name"],
         "period_hours": hours,
         "message_count": len(msgs),
         "output_language": out_lang,
         "summary": summary,
+        "quality_score": round(judgment.get("average_score", 0), 1),
     }
 
 
