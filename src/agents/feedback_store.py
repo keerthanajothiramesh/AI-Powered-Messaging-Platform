@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 from src.common.logger import get_logger
+from src.common.metrics import summary_feedback_total
 
 logger = get_logger(__name__)
 
@@ -33,6 +34,7 @@ async def save_summary_feedback(
         "created_at": datetime.now(timezone.utc),
     }
     result = await db.summary_feedback.insert_one(doc)
+    summary_feedback_total.labels(rating="auto_judge").inc()
     logger.info("summary_feedback_saved", feedback_id=doc["feedback_id"], score=doc["average_score"])
     return doc["feedback_id"]
 
@@ -65,6 +67,7 @@ async def save_response_feedback(
         "created_at": datetime.now(timezone.utc),
     }
     result = await db.summary_feedback.insert_one(doc)
+    summary_feedback_total.labels(rating="auto_judge").inc()
     logger.info("response_feedback_saved", feedback_id=doc["feedback_id"], score=doc["average_score"])
     return doc["feedback_id"]
 
@@ -77,6 +80,9 @@ async def set_user_rating(feedback_id: str, rating: int) -> bool:
         {"feedback_id": feedback_id},
         {"$set": {"user_rating": rating, "rated_at": datetime.now(timezone.utc)}},
     )
+    if result.modified_count > 0:
+        label = "thumbs_up" if rating == 1 else "thumbs_down"
+        summary_feedback_total.labels(rating=label).inc()
     return result.modified_count > 0
 
 

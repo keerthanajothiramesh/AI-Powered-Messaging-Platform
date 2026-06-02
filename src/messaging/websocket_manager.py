@@ -2,6 +2,7 @@ import json
 from typing import Dict, Set, List, Optional
 from fastapi import WebSocket
 from src.common.logger import get_logger
+from src.common.metrics import active_websocket_connections
 
 logger = get_logger(__name__)
 
@@ -14,12 +15,14 @@ class ConnectionManager:
     async def connect(self, user_id: str, websocket: WebSocket) -> None:
         await websocket.accept()
         self.active_connections[user_id] = websocket
+        active_websocket_connections.set(len(self.active_connections))
         logger.info("ws_connected", user_id=user_id, total=len(self.active_connections))
 
     def disconnect(self, user_id: str) -> None:
         self.active_connections.pop(user_id, None)
         for group_id in list(self.group_connections.keys()):
             self.group_connections[group_id].discard(user_id)
+        active_websocket_connections.set(len(self.active_connections))
         logger.info("ws_disconnected", user_id=user_id, total=len(self.active_connections))
 
     def join_group(self, user_id: str, group_id: str) -> None:

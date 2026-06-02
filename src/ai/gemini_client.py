@@ -1,7 +1,9 @@
 import asyncio
 import json
+import time
 from typing import Optional, List, Dict, Any
 from src.common.logger import get_logger
+from src.common.metrics import ai_calls_total, ai_errors_total, ai_response_duration_seconds
 
 logger = get_logger(__name__)
 
@@ -70,27 +72,32 @@ async def generate_text(
 ) -> str:
     if _is_circuit_open():
         logger.warning("openai_circuit_open_fallback")
+        ai_errors_total.labels(operation="generate").inc()
         return await _local_fallback(prompt)
 
     if not _client:
         return await _local_fallback(prompt)
 
+    ai_calls_total.labels(operation="generate").inc()
     try:
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
+        t0 = time.perf_counter()
         response = await _client.chat.completions.create(
             model=_MODEL,
             messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
         )
+        ai_response_duration_seconds.labels(operation="generate").observe(time.perf_counter() - t0)
         _record_success()
         return response.choices[0].message.content or ""
     except Exception as e:
         logger.error("openai_generate_failed", error=str(e))
+        ai_errors_total.labels(operation="generate").inc()
         _record_failure()
         return await _local_fallback(prompt)
 
@@ -102,8 +109,10 @@ async def generate_with_tools(
     system_prompt: Optional[str] = None,
 ) -> Dict[str, Any]:
     if not _client or _is_circuit_open():
+        ai_errors_total.labels(operation="tools").inc()
         return {"text": await _local_fallback(prompt), "tool_calls": []}
 
+    ai_calls_total.labels(operation="tools").inc()
     try:
         messages = []
         if system_prompt:
@@ -126,11 +135,13 @@ async def generate_with_tools(
             for tool in tools
         ]
 
+        t0 = time.perf_counter()
         response = await _client.chat.completions.create(
             model=_MODEL,
             messages=messages,
             tools=openai_tools if openai_tools else None,
         )
+        ai_response_duration_seconds.labels(operation="tools").observe(time.perf_counter() - t0)
         _record_success()
 
         msg = response.choices[0].message
@@ -146,6 +157,7 @@ async def generate_with_tools(
         return {"text": msg.content or "", "tool_calls": tool_calls}
     except Exception as e:
         logger.error("openai_tool_call_failed", error=str(e))
+        ai_errors_total.labels(operation="tools").inc()
         _record_failure()
         return {"text": await _local_fallback(prompt), "tool_calls": []}
 

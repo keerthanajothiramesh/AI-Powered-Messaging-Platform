@@ -1,4 +1,5 @@
 import json
+import time
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 from datetime import datetime, timezone
 
@@ -9,6 +10,10 @@ from src.messaging.message_service import (
 from src.auth.service import decode_token
 from src.common.database import get_pg_pool
 from src.common.logger import get_logger
+from src.common.metrics import (
+    messages_sent_total, messages_failed_total,
+    message_delivery_latency_seconds, online_users,
+)
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["websocket"])
@@ -24,6 +29,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, token: str = Qu
 
     manager = get_connection_manager()
     await manager.connect(user_id, websocket)
+    online_users.inc()
 
     # Notify all connected users that this user came online
     await manager.broadcast_to_all(
@@ -94,6 +100,7 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str, token: str = Qu
                 await manager.send_to_user(user_id, {"type": "pong"})
 
     except WebSocketDisconnect:
+        online_users.dec()
         last_seen_ts = datetime.now(timezone.utc).isoformat()
         # Broadcast offline event before removing from active connections
         await manager.broadcast_to_all(
@@ -119,6 +126,7 @@ async def _handle_send_message(sender_id: str, data: dict, manager) -> None:
     if not content:
         return
 
+    t0 = time.perf_counter()
     msg = await save_message(
         sender_id=sender_id,
         content=content,
@@ -129,20 +137,26 @@ async def _handle_send_message(sender_id: str, data: dict, manager) -> None:
         delivery_status="sent",
     )
 
+    msg_type = "group" if group_id else "dm"
+    messages_sent_total.labels(type=msg_type).inc()
+
     event = {"type": "message", "data": _serialize_message(msg)}
 
     if group_id:
         delivered_to = await manager.broadcast_to_group(group_id, event, exclude_user=sender_id)
         if delivered_to:
             await update_delivery_status(msg["message_id"], "delivered")
+            message_delivery_latency_seconds.observe(time.perf_counter() - t0)
         await manager.send_to_user(sender_id, event)
     elif receiver_id:
         delivered = await manager.send_to_user(receiver_id, event)
         await manager.send_to_user(sender_id, event)
         if delivered:
             await update_delivery_status(msg["message_id"], "delivered")
+            message_delivery_latency_seconds.observe(time.perf_counter() - t0)
         else:
             await update_delivery_status(msg["message_id"], "queued")
+            messages_failed_total.inc()
 
     try:
         from src.ai.embedding_service import get_embedding_service
