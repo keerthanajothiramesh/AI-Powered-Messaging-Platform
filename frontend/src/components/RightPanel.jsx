@@ -27,6 +27,8 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
 
   const [members, setMembers] = useState([])
   const [summary, setSummary] = useState(null)
+  const [feedbackId, setFeedbackId] = useState(null)
+  const [summaryRating, setSummaryRating] = useState(null)
   const [actionItems, setActionItems] = useState([])
   const [checkedItems, setCheckedItems] = useState({})
   const [summarising, setSummarising] = useState(false)
@@ -65,13 +67,25 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
     if (!activeConversation?.isGroup) return
     setSummarising(true)
     setSummary(null)
+    setFeedbackId(null)
+    setSummaryRating(null)
     setActionItems([])
     setCheckedItems({})
     try {
       const r = await client.post('/ai/summarise', { group_id: activeConversation.id, days: 14 })
       setSummary(r.data.summary)
+      setFeedbackId(r.data.feedback_id || null)
       setActionItems(r.data.action_items || [])
     } catch { toast.error('Summary failed') } finally { setSummarising(false) }
+  }
+
+  const handleRate = async (rating) => {
+    if (!feedbackId || summaryRating !== null) return
+    try {
+      await client.post(`/agents/feedback/${feedbackId}/rate`, { rating })
+      setSummaryRating(rating)
+      toast.success(rating === 1 ? 'Thanks for the feedback! 👍' : 'Thanks for the feedback! 👎')
+    } catch { toast.error('Could not save rating') }
   }
 
   const handleHighlights = async () => {
@@ -207,6 +221,9 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
           myRole={myRole}
           isAdmin={isAdmin}
           summary={summary}
+          feedbackId={feedbackId}
+          summaryRating={summaryRating}
+          onRate={handleRate}
           actionItems={actionItems}
           checkedItems={checkedItems}
           onToggleCheck={(i) => setCheckedItems(prev => ({ ...prev, [i]: !prev[i] }))}
@@ -254,7 +271,7 @@ export default function RightPanel({ onSearchOpen, onSettingsOpen, activeTab, on
 
 function GroupPanel({
   convId, groupTab, onTabChange, members, myRole, isAdmin,
-  summary, actionItems, checkedItems, onToggleCheck, summarising, onSummary,
+  summary, feedbackId, summaryRating, onRate, actionItems, checkedItems, onToggleCheck, summarising, onSummary,
   highlights, highlightsLoading, onHighlights,
   editing, editName, editDesc, editLoading,
   onEditStart, onEditCancel, onEditNameChange, onEditDescChange, onEditSave, onDeleteGroup,
@@ -441,6 +458,30 @@ function GroupPanel({
                 <span className="text-xs font-bold text-indigo-600">AI Summary · Last 14 days</span>
               </div>
               <p className="whitespace-pre-wrap">{summary}</p>
+              {feedbackId && (
+                <div className="flex items-center gap-2 mt-3 pt-2 border-t border-indigo-100">
+                  <span className="text-xs text-slate-400">Was this helpful?</span>
+                  <button
+                    onClick={() => onRate(1)}
+                    disabled={summaryRating !== null}
+                    className={`text-base leading-none transition-all disabled:cursor-default ${
+                      summaryRating === 1 ? 'opacity-100 scale-110' : summaryRating !== null ? 'opacity-30' : 'hover:scale-110 opacity-70 hover:opacity-100'
+                    }`}
+                    title="Good summary"
+                  >👍</button>
+                  <button
+                    onClick={() => onRate(-1)}
+                    disabled={summaryRating !== null}
+                    className={`text-base leading-none transition-all disabled:cursor-default ${
+                      summaryRating === -1 ? 'opacity-100 scale-110' : summaryRating !== null ? 'opacity-30' : 'hover:scale-110 opacity-70 hover:opacity-100'
+                    }`}
+                    title="Poor summary"
+                  >👎</button>
+                  {summaryRating !== null && (
+                    <span className="text-xs text-indigo-500 font-medium ml-1">Feedback recorded ✓</span>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
