@@ -8,4 +8,4 @@ from src.ai.chatbot.session import (  # noqa: F401
     clear_session,
 )
 from src.ai.chatbot.moderation import moderate_input as _moderate_input  # noqa: F401
-from src.ai.chatbot.tools_definition import CHATBOT_TOOLS  # noqa: F401
+from src.ai.chatbot.tools import CHATBOT_TOOLS  # noqa: F401
