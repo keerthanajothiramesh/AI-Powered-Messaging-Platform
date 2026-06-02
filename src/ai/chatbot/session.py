@@ -5,8 +5,8 @@ from typing import Any, Dict, List, Optional
 from src.ai.gemini_client import generate_with_tools, generate_text
 from src.ai.pii_guard import scan_and_anonymize
 from src.ai.chatbot.moderation import moderate_input, moderate_content
-from src.ai.chatbot.tools_definition import CHATBOT_TOOLS, build_system_prompt
-from src.ai.chatbot.tool_executor import execute_tool
+from src.ai.chatbot.tools import CHATBOT_TOOLS, build_system_prompt
+from src.ai.chatbot.tools.executor import execute_tool
 from src.common.logger import get_logger
 
 logger = get_logger(__name__)

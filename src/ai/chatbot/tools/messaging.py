@@ -1,4 +1,4 @@
-"""Extra chatbot tool handlers: unread images, send message, group member status."""
+"""Messaging action handlers: unread images, send message, group member status."""
 from typing import Any, Dict
 
 from src.common.logger import get_logger

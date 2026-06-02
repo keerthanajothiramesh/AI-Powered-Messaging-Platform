@@ -1,30 +1,37 @@
-"""Executes chatbot tool calls, mapping tool names to backend services."""
+"""Dispatches all chatbot tool calls to their handler functions."""
 from typing import Any, Dict
 
-from src.ai.chatbot.tool_executor_extras import (
-    fetch_unread_images as _fetch_unread_images_impl,
-    send_message as _send_message_impl,
-    get_group_members_status as _get_group_members_status_impl,
+from src.ai.chatbot.tools.info import (
+    get_my_action_items as _action_items,
+    get_group_activity_stats as _group_stats,
+    get_unread_count as _unread_count,
+    extract_meetings as _meetings,
 )
-from src.ai.chatbot.tool_handlers_info import (
-    get_my_action_items as _get_my_action_items,
-    get_group_activity_stats as _get_group_activity_stats,
-    get_unread_count as _get_unread_count,
-    extract_meetings as _extract_meetings,
-)
-from src.ai.chatbot.tool_handlers_compose import (
+from src.ai.chatbot.tools.compose import (
     draft_reply as _draft_reply,
-    translate_message as _translate_message,
-    set_my_status as _set_my_status,
+    translate_message as _translate,
+    set_my_status as _set_status,
     schedule_reminder as _schedule_reminder,
     get_reminders as _get_reminders,
 )
-from src.ai.chatbot.tool_handlers_search import (
-    search_messages_by_time as _search_messages_by_time,
-    list_shared_documents as _list_shared_documents,
-    catchup_for_group as _catchup_for_group,
+from src.ai.chatbot.tools.search import (
+    search_messages_by_time as _search_by_time,
+    list_shared_documents as _list_docs,
+    catchup_for_group as _catchup,
 )
-from src.ai.chatbot.tool_executor_multilingual import execute_multilingual_tool as _exec_ml
+from src.ai.chatbot.tools.messaging import (
+    fetch_unread_images as _fetch_images,
+    send_message as _send_message,
+    get_group_members_status as _group_members,
+)
+from src.ai.chatbot.tools.multilingual import (
+    suggest_replies_in_language as _suggest_replies,
+    decode_voice_message as _decode_voice,
+    compose_message_in_language as _compose,
+    explain_message_context as _explain,
+    cross_language_catchup as _cross_catchup,
+    multilingual_group_summary as _ml_summary,
+)
 from src.common.logger import get_logger
 
 logger = get_logger(__name__)
@@ -44,38 +51,47 @@ async def execute_tool(tool_name: str, args: Dict, session) -> Any:
         if tool_name == "get_user_activity":
             return await _get_user_activity(args)
         if tool_name == "fetch_unread_images":
-            return await _fetch_unread_images_impl(session)
+            return await _fetch_images(session)
         if tool_name == "send_message":
-            return await _send_message_impl(args, session)
+            return await _send_message(args, session)
         if tool_name == "get_group_members_status":
-            return await _get_group_members_status_impl(args)
+            return await _group_members(args)
         if tool_name == "get_my_action_items":
-            return await _get_my_action_items(args, session)
+            return await _action_items(args, session)
         if tool_name == "get_group_activity_stats":
-            return await _get_group_activity_stats(args)
+            return await _group_stats(args)
         if tool_name == "set_my_status":
-            return await _set_my_status(args, session)
+            return await _set_status(args, session)
         if tool_name == "get_unread_count":
-            return await _get_unread_count(session)
+            return await _unread_count(session)
         if tool_name == "draft_reply":
             return await _draft_reply(args)
         if tool_name == "search_messages_by_time":
-            return await _search_messages_by_time(args, session)
+            return await _search_by_time(args, session)
         if tool_name == "list_shared_documents":
-            return await _list_shared_documents(args)
+            return await _list_docs(args)
         if tool_name == "translate_message":
-            return await _translate_message(args)
+            return await _translate(args)
         if tool_name == "schedule_reminder":
             return await _schedule_reminder(args, session)
         if tool_name == "get_reminders":
             return await _get_reminders(session)
         if tool_name == "extract_meetings":
-            return await _extract_meetings(args)
+            return await _meetings(args)
         if tool_name == "catchup_for_group":
-            return await _catchup_for_group(args, session)
-        ml = await _exec_ml(tool_name, args, session)
-        if ml is not None:
-            return ml
+            return await _catchup(args, session)
+        if tool_name == "suggest_replies_in_language":
+            return await _suggest_replies(args, session)
+        if tool_name == "decode_voice_message":
+            return await _decode_voice(args, session)
+        if tool_name == "compose_message_in_language":
+            return await _compose(args, session)
+        if tool_name == "explain_message_context":
+            return await _explain(args, session)
+        if tool_name == "cross_language_catchup":
+            return await _cross_catchup(args, session)
+        if tool_name == "multilingual_group_summary":
+            return await _ml_summary(args, session)
     except Exception as exc:
         logger.error("tool_execution_failed", tool=tool_name, error=str(exc))
         return {"error": str(exc)}
@@ -155,5 +171,3 @@ async def _get_user_activity(args: Dict) -> Any:
         "presence": user["user_presence"],
         "last_seen": user["last_seen"].isoformat() if user["last_seen"] else None,
     }
-
-
