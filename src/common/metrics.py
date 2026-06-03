@@ -151,8 +151,22 @@ async def get_metrics_summary() -> dict:
     except Exception:
         online_count = 0
 
-    # Recent error rate (last 100 requests sampled via Prometheus)
-    # We expose the raw Prometheus counters as JSON here
+    # Latest scheduled-agent run summaries
+    from src.agents.feedback_store import get_latest_agent_run
+    delivery_run    = await get_latest_agent_run("DeliveryAgent")
+    moderation_run  = await get_latest_agent_run("CrossGroupModerationAgent")
+    rca_run         = await get_latest_agent_run("RCAAgent")
+
+    def _iso(doc):
+        ran_at = doc.get("ran_at")
+        if ran_at and hasattr(ran_at, "isoformat"):
+            return ran_at.isoformat()
+        return ran_at
+
+    dr = delivery_run.get("result", {})
+    mr = moderation_run.get("result", {})
+    rr = rca_run.get("result", {})
+
     return {
         "messages": {
             "total": total_msgs,
@@ -171,5 +185,26 @@ async def get_metrics_summary() -> dict:
         },
         "users": {
             "online": int(online_count or 0),
+        },
+        "agents": {
+            "delivery": {
+                "ran_at":      _iso(delivery_run),
+                "failed_found": dr.get("failed_found", 0),
+                "recovered":   dr.get("recovered", 0),
+                "escalated":   dr.get("escalated", 0),
+                "pending":     dr.get("pending", 0),
+            },
+            "moderation": {
+                "ran_at":        _iso(moderation_run),
+                "scanned_users": mr.get("total_scanned_users", 0),
+                "flagged_users": len(mr.get("flagged_users", [])),
+                "analysis":      (mr.get("analysis", "") or "")[:220],
+            },
+            "rca": {
+                "ran_at":          _iso(rca_run),
+                "failure_rate_pct": rr.get("failure_rate_pct", 0),
+                "total_failed":    rr.get("total_failed", 0),
+                "analysis":        (rr.get("analysis", "") or "")[:220],
+            },
         },
     }

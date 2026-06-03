@@ -100,6 +100,26 @@ async def get_top_summaries(group_id: str = None, limit: int = 3) -> List[Dict[s
     return await cursor.to_list(length=limit)
 
 
+async def save_agent_run(agent_name: str, result: Dict[str, Any]) -> None:
+    """Upsert the latest run result for a scheduled agent (one doc per agent)."""
+    from src.common.database import get_mongo_db
+    db = get_mongo_db()
+    await db.agent_runs.replace_one(
+        {"agent_name": agent_name},
+        {"agent_name": agent_name, "result": result, "ran_at": datetime.now(timezone.utc)},
+        upsert=True,
+    )
+    logger.info("agent_run_saved", agent=agent_name)
+
+
+async def get_latest_agent_run(agent_name: str) -> Dict[str, Any]:
+    """Return the most recent run document for the given agent, or {}."""
+    from src.common.database import get_mongo_db
+    db = get_mongo_db()
+    doc = await db.agent_runs.find_one({"agent_name": agent_name}, {"_id": 0})
+    return doc or {}
+
+
 async def get_feedback_stats() -> Dict[str, Any]:
     """Aggregate stats used by the observability dashboard."""
     from src.common.database import get_mongo_db

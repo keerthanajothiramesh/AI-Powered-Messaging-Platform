@@ -1,3 +1,4 @@
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,6 +16,51 @@ from src.common.exceptions import (
 
 configure_logging(settings.LOG_LEVEL)
 logger = get_logger(__name__)
+
+
+async def _schedule_delivery_agent():
+    """Retry failed message deliveries every 5 minutes."""
+    await asyncio.sleep(30)
+    while True:
+        try:
+            from src.agents.delivery_agent import DeliveryAgent
+            from src.agents.feedback_store import save_agent_run
+            result = await DeliveryAgent().run({})
+            await save_agent_run("DeliveryAgent", result)
+            logger.info("scheduled_delivery_done", recovered=result.get("recovered", 0))
+        except Exception as exc:
+            logger.warning("scheduled_delivery_failed", error=str(exc))
+        await asyncio.sleep(5 * 60)
+
+
+async def _schedule_moderation_agent():
+    """Scan all groups for cross-group toxic patterns every 24 hours."""
+    await asyncio.sleep(60)
+    while True:
+        try:
+            from src.agents.cross_group_agent import CrossGroupModerationAgent
+            from src.agents.feedback_store import save_agent_run
+            result = await CrossGroupModerationAgent().run({"hours": 24})
+            await save_agent_run("CrossGroupModerationAgent", result)
+            logger.info("scheduled_moderation_done", flagged=len(result.get("flagged_users", [])))
+        except Exception as exc:
+            logger.warning("scheduled_moderation_failed", error=str(exc))
+        await asyncio.sleep(24 * 3600)
+
+
+async def _schedule_rca_agent():
+    """Run delivery failure root-cause analysis every 6 hours."""
+    await asyncio.sleep(90)
+    while True:
+        try:
+            from src.agents.rca_agent import RCAAgent
+            from src.agents.feedback_store import save_agent_run
+            result = await RCAAgent().run({"hours": 24})
+            await save_agent_run("RCAAgent", result)
+            logger.info("scheduled_rca_done", failure_rate=result.get("failure_rate_pct", 0))
+        except Exception as exc:
+            logger.warning("scheduled_rca_failed", error=str(exc))
+        await asyncio.sleep(6 * 3600)
 
 
 @asynccontextmanager
@@ -74,9 +120,18 @@ async def lifespan(app: FastAPI):
     Path(settings.LOCAL_UPLOADS_PATH).mkdir(parents=True, exist_ok=True)
     logger.info("startup_complete")
 
+    _bg_tasks = [
+        asyncio.create_task(_schedule_delivery_agent(),   name="delivery-agent"),
+        asyncio.create_task(_schedule_moderation_agent(), name="moderation-agent"),
+        asyncio.create_task(_schedule_rca_agent(),        name="rca-agent"),
+    ]
+    logger.info("scheduled_agents_started", count=len(_bg_tasks))
+
     yield
 
     logger.info("shutdown_begin")
+    for t in _bg_tasks:
+        t.cancel()
     try:
         from src.common.database import close_postgres, close_mongodb
         await close_postgres()

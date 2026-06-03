@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Activity, MessageSquare, Brain, Users, TrendingUp, AlertTriangle, CheckCircle } from 'lucide-react'
+import { RefreshCw, Activity, MessageSquare, Brain, Users, TrendingUp, AlertTriangle, CheckCircle, Clock, Shield, Zap, RotateCcw } from 'lucide-react'
 import client from '../api/client'
 
 const REFRESH_INTERVAL_MS = 30_000
@@ -43,6 +43,50 @@ function QualityBar({ label, score, max = 10 }) {
   )
 }
 
+function timeAgo(isoStr) {
+  if (!isoStr) return 'Never run'
+  const diff = Date.now() - new Date(isoStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'Just now'
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs}h ago`
+  return `${Math.floor(hrs / 24)}d ago`
+}
+
+function AgentCard({ icon: Icon, title, ranAt, schedule, stats, analysis, alertCount = 0 }) {
+  const hasAlert = alertCount > 0
+  return (
+    <div className={`bg-white rounded-2xl border p-4 shadow-sm ${hasAlert ? 'border-amber-200' : 'border-slate-100'}`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${hasAlert ? 'bg-amber-50 text-amber-600' : 'bg-indigo-50 text-indigo-600'}`}>
+            <Icon className="w-4 h-4" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-800">{title}</p>
+            <p className="text-xs text-slate-400">{schedule}</p>
+          </div>
+        </div>
+        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${ranAt !== 'Never run' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+          {timeAgo(ranAt)}
+        </span>
+      </div>
+      <div className="flex flex-wrap gap-3 mb-3">
+        {stats.map(({ label, value, red }) => (
+          <div key={label} className="text-center">
+            <div className={`text-lg font-bold ${red ? 'text-red-500' : 'text-slate-800'}`}>{value}</div>
+            <div className="text-xs text-slate-400">{label}</div>
+          </div>
+        ))}
+      </div>
+      {analysis && (
+        <p className="text-xs text-slate-500 leading-relaxed border-t border-slate-50 pt-2 line-clamp-3">{analysis}</p>
+      )}
+    </div>
+  )
+}
+
 export default function ObservabilityDashboard({ onClose }) {
   const [data, setData]       = useState(null)
   const [loading, setLoading] = useState(true)
@@ -72,6 +116,7 @@ export default function ObservabilityDashboard({ onClose }) {
   const msgs     = data?.messages     || {}
   const aiQ      = data?.ai_quality   || {}
   const users    = data?.users        || {}
+  const agents   = data?.agents       || {}
   const deliveryOk = (msgs.delivery_rate_pct ?? 100) >= 95
 
   return (
@@ -188,6 +233,50 @@ export default function ObservabilityDashboard({ onClose }) {
                   value={(aiQ.total_evaluations ?? 0).toLocaleString()}
                   sub="summaries + chatbot responses"
                   color="indigo"
+                />
+              </div>
+            </section>
+
+            {/* Scheduled Agents */}
+            <section>
+              <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Scheduled Agents</h3>
+              <div className="space-y-3">
+                <AgentCard
+                  icon={RotateCcw}
+                  title="Delivery Agent"
+                  schedule="Runs every 5 minutes · retries failed messages"
+                  ranAt={agents.delivery?.ran_at}
+                  alertCount={agents.delivery?.escalated ?? 0}
+                  stats={[
+                    { label: 'Failed Found',  value: agents.delivery?.failed_found ?? '—' },
+                    { label: 'Recovered',     value: agents.delivery?.recovered    ?? '—', },
+                    { label: 'Escalated',     value: agents.delivery?.escalated    ?? '—', red: (agents.delivery?.escalated ?? 0) > 0 },
+                    { label: 'Pending',       value: agents.delivery?.pending      ?? '—' },
+                  ]}
+                />
+                <AgentCard
+                  icon={Shield}
+                  title="Cross-Group Moderation Agent"
+                  schedule="Runs every 24 hours · scans all groups for toxic patterns"
+                  ranAt={agents.moderation?.ran_at}
+                  alertCount={agents.moderation?.flagged_users ?? 0}
+                  stats={[
+                    { label: 'Users Scanned', value: agents.moderation?.scanned_users ?? '—' },
+                    { label: 'Flagged',        value: agents.moderation?.flagged_users ?? '—', red: (agents.moderation?.flagged_users ?? 0) > 0 },
+                  ]}
+                  analysis={agents.moderation?.analysis}
+                />
+                <AgentCard
+                  icon={Zap}
+                  title="RCA Agent"
+                  schedule="Runs every 6 hours · root-cause analysis of delivery failures"
+                  ranAt={agents.rca?.ran_at}
+                  alertCount={(agents.rca?.failure_rate_pct ?? 0) >= 5 ? 1 : 0}
+                  stats={[
+                    { label: 'Total Failed',   value: agents.rca?.total_failed      ?? '—' },
+                    { label: 'Failure Rate',   value: agents.rca?.failure_rate_pct != null ? `${agents.rca.failure_rate_pct}%` : '—', red: (agents.rca?.failure_rate_pct ?? 0) >= 5 },
+                  ]}
+                  analysis={agents.rca?.analysis}
                 />
               </div>
             </section>
