@@ -46,32 +46,48 @@ async def search_messages_by_time(args: Dict, session) -> Any:
 
 
 async def list_shared_documents(args: Dict) -> Any:
-    from src.search.search_service import hybrid_search
-    query = args.get("query", "document file report presentation")
-    results = await hybrid_search(query, n_results=20)
-    doc_results = [r for r in results if r.get("source_type") == "document"]
-    if not doc_results:
-        try:
-            from src.ai.vector_store import get_vector_store
-            vs = get_vector_store()
-            if vs:
-                doc_results = await vs.search_document_chunks(query, n_results=15)
-        except Exception as exc:
-            logger.warning("doc_search_fallback_failed", error=str(exc))
+    from src.ai.vector_store import get_vector_store
 
-    seen: set = set()
-    docs = []
+    query = args.get("query") or "document"
+    try:
+        vs = get_vector_store()
+        doc_results = await vs.search_document_chunks(query, n_results=30) if vs else []
+    except Exception as exc:
+        logger.warning("doc_search_failed", error=str(exc))
+        doc_results = []
+
+    # Group chunks by filename, track the best (max) relevance score per document
+    filename_best: Dict[str, Dict] = {}
     for r in doc_results:
         meta = r.get("metadata", {})
         fname = meta.get("filename", "unknown")
-        if fname not in seen:
-            seen.add(fname)
-            docs.append({
-                "filename": fname,
+        score = float(r.get("score", 0))
+        if fname not in filename_best or score > filename_best[fname]["score"]:
+            filename_best[fname] = {
+                "score": score,
                 "uploaded_by": meta.get("uploader_id", ""),
                 "group_id": meta.get("group_id", ""),
-                "preview": r.get("content", "")[:100],
-            })
+                "preview": r.get("content", "")[:120],
+            }
+
+    # Keep only documents whose best-chunk score is above the relevance threshold,
+    # then return the top 5 sorted by score descending
+    MIN_SCORE = 0.35
+    relevant = sorted(
+        [(fname, data) for fname, data in filename_best.items() if data["score"] >= MIN_SCORE],
+        key=lambda x: x[1]["score"],
+        reverse=True,
+    )[:5]
+
+    docs = [
+        {
+            "filename": fname,
+            "uploaded_by": data["uploaded_by"],
+            "group_id": data["group_id"],
+            "preview": data["preview"],
+        }
+        for fname, data in relevant
+    ]
     return {"documents": docs, "count": len(docs)}
 
 

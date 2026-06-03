@@ -147,11 +147,14 @@ CHATBOT_TOOLS = [
     },
     {
         "name": "list_shared_documents",
-        "description": "List files and documents shared in conversations, optionally filtered by group or topic.",
+        "description": (
+            "Find uploaded documents that are relevant to the user's topic. "
+            "Always pass the user's actual topic or question as 'query' so only relevant files are returned."
+        ),
         "parameters": {"type": "object", "properties": {
-            "query": {"type": "string", "description": "Topic or file type to search for"},
+            "query": {"type": "string", "description": "The user's topic or question used to filter documents by relevance (e.g. 'leave policy', 'Q1 revenue')"},
             "group_name": {"type": "string", "description": "Optional: limit to a specific group"},
-        }, "required": []},
+        }, "required": ["query"]},
     },
     {
         "name": "summarize_document",
