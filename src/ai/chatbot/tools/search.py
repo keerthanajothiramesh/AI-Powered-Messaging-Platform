@@ -47,6 +47,7 @@ async def search_messages_by_time(args: Dict, session) -> Any:
 
 async def list_shared_documents(args: Dict) -> Any:
     from src.ai.vector_store import get_vector_store
+    from src.common.database import get_mongo_db
 
     query = args.get("query") or "document"
     try:
@@ -56,22 +57,24 @@ async def list_shared_documents(args: Dict) -> Any:
         logger.warning("doc_search_failed", error=str(exc))
         doc_results = []
 
-    # Group chunks by filename, track the best (max) relevance score per document
+    # Group chunks by filename; track best score and the media_id for URL lookup
     filename_best: Dict[str, Dict] = {}
     for r in doc_results:
         meta = r.get("metadata", {})
         fname = meta.get("filename", "unknown")
         score = float(r.get("score", 0))
+        # message_id format: "doc::<media_id>::<chunk_index>"
+        parts = r.get("message_id", "").split("::")
+        media_id = parts[1] if len(parts) >= 3 else ""
         if fname not in filename_best or score > filename_best[fname]["score"]:
             filename_best[fname] = {
                 "score": score,
+                "media_id": media_id,
                 "uploaded_by": meta.get("uploader_id", ""),
                 "group_id": meta.get("group_id", ""),
                 "preview": r.get("content", "")[:120],
             }
 
-    # Keep only documents whose best-chunk score is above the relevance threshold,
-    # then return the top 5 sorted by score descending
     MIN_SCORE = 0.35
     relevant = sorted(
         [(fname, data) for fname, data in filename_best.items() if data["score"] >= MIN_SCORE],
@@ -79,15 +82,22 @@ async def list_shared_documents(args: Dict) -> Any:
         reverse=True,
     )[:5]
 
-    docs = [
-        {
+    # Resolve the actual file URL from MongoDB (covers both S3 and local storage)
+    db = get_mongo_db()
+    docs = []
+    for fname, data in relevant:
+        url = ""
+        if data["media_id"]:
+            rec = await db.media.find_one({"media_id": data["media_id"]}, {"url": 1})
+            if rec:
+                url = rec.get("url", "")
+        docs.append({
             "filename": fname,
+            "url": url,
             "uploaded_by": data["uploaded_by"],
             "group_id": data["group_id"],
             "preview": data["preview"],
-        }
-        for fname, data in relevant
-    ]
+        })
     return {"documents": docs, "count": len(docs)}
 
 

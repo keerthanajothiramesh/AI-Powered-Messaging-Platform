@@ -47,14 +47,17 @@ CHATBOT_TOOLS = [
     },
     {
         "name": "find_media",
-        "description": "Find media files (images, videos, voice notes) in chat history",
+        "description": (
+            "Find uploaded media files — images, diagrams, videos, documents — by keyword. "
+            "Use for 'show me the architecture diagram', 'find the logo image', 'fetch the onboarding video', etc."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
-                "media_type": {"type": "string", "description": "Type: image/video/voice"},
-                "keywords": {"type": "string", "description": "Keywords to search in media descriptions"},
+                "media_type": {"type": "string", "description": "Optional filter: image / video / voice / document"},
+                "keywords": {"type": "string", "description": "Keywords to match against filename or description (e.g. 'architecture diagram', 'logo')"},
             },
-            "required": ["media_type"],
+            "required": ["keywords"],
         },
     },
     {
@@ -350,6 +353,7 @@ IMPORTANT RULES:
 - For specific message lookup: use 'search_messages'. For time-filtered: use 'search_messages_by_time'.
 - For 'send a reminder to X' or 'message X': use 'send_message'.
 - For 'set me as busy/away': use 'set_my_status'.
+- For 'show me [image/diagram/photo]', 'fetch [diagram]', 'find the [logo/architecture/screenshot]': use 'find_media' with relevant keywords (e.g. keywords='architecture diagram'). Use media_type='image' for diagrams/photos.
 - For 'summarize [document]', 'what does [document] say', or any question about a document's content: use 'summarize_document' with the filename (partial name is fine). Pass the user's question in the 'question' field when they ask something specific.
 - When a result has source='document', always mention the filename.
 - For 'help me reply to [name]': use 'suggest_replies_in_language'. For 'what does [name] mean': use 'explain_message_context'.

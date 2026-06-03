@@ -370,10 +370,12 @@ function BotToolResult({ toolCalls }) {
   for (const { result } of toolCalls) {
     if (!result) continue
 
-    // list_shared_documents → { documents: [{filename, ...}] }
+    // list_shared_documents → { documents: [{filename, url, ...}] }
     if (result.documents) {
       for (const doc of result.documents) {
-        const url = `${API_BASE}/media/file/${encodeURIComponent(doc.filename)}`
+        // prefer the real URL from db.media; fall back to /media/file/ for local
+        const raw = doc.url || `/media/file/${encodeURIComponent(doc.filename)}`
+        const url = resolveUrl(raw)
         if (IMAGE_EXT.test(doc.filename)) {
           images.push({ url, name: doc.filename })
         } else {
@@ -382,15 +384,18 @@ function BotToolResult({ toolCalls }) {
       }
     }
 
-    // Array results: find_media, fetch_unread_images, search_messages
+    // Array results: find_media → {filename, url, media_type}
+    //                fetch_unread_images / search_messages → {media_url, media_type, content}
     if (Array.isArray(result)) {
       for (const r of result) {
-        if (!r.media_url) continue
-        const url = resolveUrl(r.media_url)
-        if (r.media_type === 'image' || IMAGE_EXT.test(r.content || '')) {
-          images.push({ url, name: r.content || 'image' })
+        const raw = r.url || r.media_url
+        if (!raw) continue
+        const url = resolveUrl(raw)
+        const name = r.filename || r.content || 'file'
+        if (r.media_type === 'image' || IMAGE_EXT.test(name)) {
+          images.push({ url, name })
         } else if (r.media_type === 'document' || r.media_type === 'file') {
-          files.push({ url, name: r.content || 'file' })
+          files.push({ url, name })
         }
       }
     }

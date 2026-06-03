@@ -150,12 +150,34 @@ async def _get_conversation_summary(args: Dict) -> Any:
 
 
 async def _find_media(args: Dict) -> Any:
-    from src.ai.vector_store import get_vector_store
-    vs = get_vector_store()
-    if not vs:
-        return []
-    keywords = args.get("keywords", args.get("media_type", ""))
-    return vs.search_media(keywords, n_results=10, media_type=args.get("media_type"))
+    from src.common.database import get_mongo_db
+    db = get_mongo_db()
+    media_type = args.get("media_type", "")
+    keywords = args.get("keywords", "")
+
+    mongo_filter = {}
+    if media_type and media_type not in ("any", "all"):
+        mongo_filter["media_type"] = media_type
+    if keywords:
+        mongo_filter["$or"] = [
+            {"original_name": {"$regex": keywords, "$options": "i"}},
+            {"description": {"$regex": keywords, "$options": "i"}},
+        ]
+
+    cursor = db.media.find(
+        mongo_filter,
+        {"media_id": 1, "original_name": 1, "url": 1, "media_type": 1, "description": 1},
+    ).sort("_id", -1).limit(10)
+    results = await cursor.to_list(length=10)
+    return [
+        {
+            "filename": r.get("original_name", ""),
+            "url": r.get("url", ""),
+            "media_type": r.get("media_type", ""),
+            "description": r.get("description", ""),
+        }
+        for r in results
+    ]
 
 
 async def _get_user_activity(args: Dict) -> Any:

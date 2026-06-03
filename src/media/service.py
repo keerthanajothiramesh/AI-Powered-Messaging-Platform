@@ -81,7 +81,8 @@ async def _try_s3_upload(data: bytes, key: str, content_type: str) -> Optional[s
                 Key=key,
                 Body=data,
                 ContentType=content_type,
-                ACL="public-read",
+                # ACL omitted — use bucket policy for public read instead of
+                # per-object ACL (Block Public Access rejects ACL on new buckets)
             ),
         )
         url = f"https://{settings.AWS_S3_BUCKET}.s3.{settings.AWS_REGION}.amazonaws.com/{key}"
