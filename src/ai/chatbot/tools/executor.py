@@ -18,6 +18,7 @@ from src.ai.chatbot.tools.search import (
     search_messages_by_time as _search_by_time,
     list_shared_documents as _list_docs,
     catchup_for_group as _catchup,
+    summarize_document as _summarize_document,
 )
 from src.ai.chatbot.tools.messaging import (
     fetch_unread_images as _fetch_images,
@@ -70,6 +71,8 @@ async def execute_tool(tool_name: str, args: Dict, session) -> Any:
             return await _search_by_time(args, session)
         if tool_name == "list_shared_documents":
             return await _list_docs(args)
+        if tool_name == "summarize_document":
+            return await _summarize_document(args)
         if tool_name == "translate_message":
             return await _translate(args)
         if tool_name == "schedule_reminder":

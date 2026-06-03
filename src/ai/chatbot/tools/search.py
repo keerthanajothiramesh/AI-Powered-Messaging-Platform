@@ -75,6 +75,45 @@ async def list_shared_documents(args: Dict) -> Any:
     return {"documents": docs, "count": len(docs)}
 
 
+async def summarize_document(args: Dict) -> Any:
+    from src.common.database import get_pg_pool
+    from src.ai.gemini_client import generate_text
+
+    filename_query = args.get("filename", "")
+    question = args.get("question", "")
+
+    pool = get_pg_pool()
+    try:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT content, filename, chunk_index FROM document_chunks "
+                "WHERE filename ILIKE $1 ORDER BY chunk_index",
+                f"%{filename_query}%",
+            )
+        if not rows:
+            return {
+                "error": f"No content found for '{filename_query}'. "
+                         "Use list_shared_documents to find the exact filename."
+            }
+        actual_filename = rows[0]["filename"]
+        full_text = "\n\n".join(r["content"] for r in rows)
+        if question:
+            prompt = (
+                f"Document: {actual_filename}\n\nContent:\n{full_text[:8000]}\n\n"
+                f"Question: {question}\n\nAnswer based on the document content:"
+            )
+        else:
+            prompt = (
+                f"Document: {actual_filename}\n\nContent:\n{full_text[:8000]}\n\n"
+                "Provide a comprehensive summary of this document."
+            )
+        summary = await generate_text(prompt, max_tokens=800)
+        return {"filename": actual_filename, "summary": summary, "chunks_used": len(rows)}
+    except Exception as exc:
+        logger.error("summarize_document_failed", error=str(exc))
+        return {"error": str(exc)}
+
+
 async def catchup_for_group(args: Dict, session) -> Any:
     from src.common.database import get_mongo_db, get_pg_pool
     from src.ai.gemini_client import generate_text

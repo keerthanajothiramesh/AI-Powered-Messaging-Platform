@@ -154,6 +154,18 @@ CHATBOT_TOOLS = [
         }, "required": []},
     },
     {
+        "name": "summarize_document",
+        "description": (
+            "Read the full content of a specific uploaded document and summarize it, or answer a question "
+            "about its content. Use this whenever the user asks to summarize a document, asks what a document "
+            "contains, or asks a specific question about a document (PDF, DOCX, report, etc.)."
+        ),
+        "parameters": {"type": "object", "properties": {
+            "filename": {"type": "string", "description": "Filename or partial name of the document (e.g. 'Q1_Financial_Report')"},
+            "question": {"type": "string", "description": "Optional specific question to answer from the document"},
+        }, "required": ["filename"]},
+    },
+    {
         "name": "translate_message",
         "description": "Find a specific message and translate it to another language.",
         "parameters": {"type": "object", "properties": {
@@ -335,6 +347,7 @@ IMPORTANT RULES:
 - For specific message lookup: use 'search_messages'. For time-filtered: use 'search_messages_by_time'.
 - For 'send a reminder to X' or 'message X': use 'send_message'.
 - For 'set me as busy/away': use 'set_my_status'.
+- For 'summarize [document]', 'what does [document] say', or any question about a document's content: use 'summarize_document' with the filename (partial name is fine). Pass the user's question in the 'question' field when they ask something specific.
 - When a result has source='document', always mention the filename.
 - For 'help me reply to [name]': use 'suggest_replies_in_language'. For 'what does [name] mean': use 'explain_message_context'.
 - For 'compose in Japanese'/'tell [name] that...': use 'compose_message_in_language'. For voice/message decode: use 'decode_voice_message'.

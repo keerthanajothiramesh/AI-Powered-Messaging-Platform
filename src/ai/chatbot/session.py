@@ -61,10 +61,10 @@ class ChatbotSession:
             result = await execute_tool(tool_name, tool_args, self)
             tool_results.append({"tool": tool_name, "result": result})
             if result:
-                context = f"\n\nTool result from {tool_name}: {str(result)[:500]}"
+                context = f"\n\nTool result from {tool_name}: {str(result)[:4000]}"
                 final_text = await generate_text(
                     f"User asked: {message}{context}\n\nProvide a helpful, emoji-friendly response.",
-                    system_prompt=system_prompt, max_tokens=512,
+                    system_prompt=system_prompt, max_tokens=1024,
                 )
 
         self.history.append({"role": "assistant", "content": final_text})

@@ -36,6 +36,9 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
   const [suggestionsLoading, setSuggestionsLoading] = useState(false)
   const [recordingSeconds, setRecordingSeconds] = useState(0)
   const [showAttachMenu, setShowAttachMenu] = useState(false)
+  const [pendingUpload, setPendingUpload] = useState(null)
+  const [uploadDescription, setUploadDescription] = useState('')
+  const [uploadLoading, setUploadLoading] = useState(false)
   const [showImprove, setShowImprove] = useState(false)
   const [improveLoading, setImproveLoading] = useState(false)
   const [topics, setTopics] = useState([])
@@ -168,19 +171,32 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
     }
   }
 
-  const handleFileUpload = async (e) => {
+  const handleFileUpload = (e) => {
     const file = e.target.files[0]
     if (!file) return
+    setPendingUpload({ file })
+    setUploadDescription('')
+    e.target.value = ''
+  }
+
+  const handleConfirmUpload = async () => {
+    if (!pendingUpload || uploadLoading) return
+    const { file } = pendingUpload
     const fd = new FormData()
     fd.append('file', file)
     if (activeConversation.isGroup) fd.append('group_id', convId)
+    if (uploadDescription.trim()) fd.append('description', uploadDescription.trim())
+    setUploadLoading(true)
     try {
       const r = await client.post('/media/upload', fd)
-      sendMessage(file.name, convId, activeConversation.isGroup, r.data.media_type, r.data.url)
+      const msgContent = uploadDescription.trim() || file.name
+      sendMessage(msgContent, convId, activeConversation.isGroup, r.data.media_type, r.data.url)
       if (r.data.storage === 's3') toast.success('Uploaded to S3')
       else toast.success('File sent')
+      setPendingUpload(null)
+      setUploadDescription('')
     } catch { toast.error('Upload failed') }
-    e.target.value = ''
+    finally { setUploadLoading(false) }
   }
 
   const startRecording = async () => {
@@ -438,6 +454,59 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
             <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-bounce" style={{ animationDelay: '300ms' }} />
           </span>
           typing…
+        </div>
+      )}
+
+      {/* Pending upload: description input before sending */}
+      {pendingUpload && (
+        <div
+          className="px-4 py-3 border-t border-indigo-100 flex-shrink-0"
+          style={{ background: 'linear-gradient(135deg, rgba(238,242,255,0.9), rgba(245,243,255,0.9))' }}
+        >
+          <div className="flex items-start gap-3">
+            {pendingUpload.file.type.startsWith('image/') ? (
+              <img
+                src={URL.createObjectURL(pendingUpload.file)}
+                alt="preview"
+                className="w-12 h-12 rounded-xl object-cover border border-indigo-200 flex-shrink-0"
+              />
+            ) : (
+              <div className="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center flex-shrink-0 border border-indigo-200">
+                <FileText size={20} className="text-indigo-600" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-slate-500 truncate mb-1">{pendingUpload.file.name}</p>
+              <input
+                autoFocus
+                value={uploadDescription}
+                onChange={(e) => setUploadDescription(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleConfirmUpload() }
+                  if (e.key === 'Escape') { setPendingUpload(null); setUploadDescription('') }
+                }}
+                placeholder="Add a description (optional)"
+                className="w-full text-sm px-3 py-2 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300"
+              />
+            </div>
+            <div className="flex flex-col gap-1.5 flex-shrink-0">
+              <button
+                onClick={handleConfirmUpload}
+                disabled={uploadLoading}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs text-white rounded-xl shadow-sm transition-all disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #6366f1, #7c3aed)' }}
+              >
+                {uploadLoading ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />}
+                Send
+              </button>
+              <button
+                onClick={() => { setPendingUpload(null); setUploadDescription('') }}
+                className="px-3 py-1.5 text-xs text-slate-500 hover:text-slate-700 rounded-xl hover:bg-slate-200 transition-all text-center"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
