@@ -4,6 +4,9 @@ import { X, Search, Loader2, Sparkles } from 'lucide-react'
 import { format } from 'date-fns'
 import client from '../api/client'
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const IMAGE_EXT = /\.(png|jpg|jpeg|gif|webp|svg)$/i
+
 export default function SearchModal({ onClose }) {
   const { t } = useTranslation()
   const [query, setQuery] = useState('')
@@ -136,13 +139,39 @@ function ResultCard({ result, query }) {
   const meta = result.metadata || {}
   const ts = meta.timestamp ? format(new Date(meta.timestamp), 'MMM d, HH:mm') : ''
 
+  const filename = meta.filename || ''
+  const isImage = IMAGE_EXT.test(filename) || meta.media_type === 'image'
+  const fileUrl = filename ? `${API_BASE}/media/file/${encodeURIComponent(filename)}` : ''
+
   return (
     <div className="border border-slate-100 rounded-xl p-3 mb-2 hover:bg-indigo-50/30 hover:border-indigo-100 transition-all shadow-sm">
+      {isImage && fileUrl && (
+        <img
+          src={fileUrl}
+          alt={filename}
+          className="w-full max-h-40 object-contain bg-slate-50 rounded-lg mb-2 cursor-pointer hover:opacity-90 transition-opacity"
+          onClick={() => window.open(fileUrl, '_blank')}
+          onError={(e) => { e.target.style.display = 'none' }}
+        />
+      )}
       <p className="text-sm text-slate-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: highlighted }} />
-      <div className="flex gap-3 mt-2 text-xs text-slate-400">
+      <div className="flex items-center gap-3 mt-2 text-xs text-slate-400 flex-wrap">
         {ts && <span>{ts}</span>}
         {meta.media_type && meta.media_type !== 'text' && (
           <span className="capitalize bg-indigo-50 text-indigo-500 px-1.5 py-0.5 rounded-full font-medium">{meta.media_type}</span>
+        )}
+        {filename && (
+          <span className="text-slate-500 truncate max-w-[200px]" title={filename}>📄 {filename}</span>
+        )}
+        {fileUrl && !isImage && (
+          <a
+            href={fileUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="ml-auto text-indigo-500 font-semibold hover:underline flex-shrink-0"
+          >
+            Open ↗
+          </a>
         )}
       </div>
     </div>

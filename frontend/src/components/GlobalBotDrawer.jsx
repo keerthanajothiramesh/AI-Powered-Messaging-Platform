@@ -3,6 +3,14 @@ import { X, Sparkles, Send, Mic, Paperclip, Plus, MessageSquare, Bot, Loader2, H
 import client from '../api/client'
 import AIHelpGuide from './AIHelpGuide'
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const IMAGE_EXT = /\.(png|jpg|jpeg|gif|webp|svg)$/i
+
+function resolveUrl(url) {
+  if (!url) return ''
+  return url.startsWith('http') ? url : `${API_BASE}${url}`
+}
+
 const EMOJIS = ['😊','👍','❤️','🎉','😂','🤔','👏','🙏','💡','✅','⚡','🔥','💯','🚀','📌','✨','🎯','👀']
 
 const STARTERS = [
@@ -242,21 +250,26 @@ export default function GlobalBotDrawer({ onClose }) {
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {msgs.map((msg, i) => (
                 <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[85%] text-sm rounded-2xl px-4 py-2.5 leading-relaxed ${
-                      msg.role === 'user'
-                        ? 'text-white rounded-br-sm shadow-sm'
-                        : 'bg-slate-50 text-slate-700 border border-slate-100 rounded-bl-sm'
-                    }`}
-                    style={msg.role === 'user' ? { background: 'linear-gradient(135deg, #6366f1, #7c3aed)' } : {}}
-                  >
-                    {msg.role === 'bot' && (
-                      <span className="flex items-center gap-1.5 mb-1.5">
-                        <Sparkles size={10} className="text-indigo-400" />
-                        <span className="text-xs text-indigo-500 font-semibold">AI ✨</span>
-                      </span>
+                  <div className="max-w-[85%] flex flex-col gap-2">
+                    <div
+                      className={`text-sm rounded-2xl px-4 py-2.5 leading-relaxed ${
+                        msg.role === 'user'
+                          ? 'text-white rounded-br-sm shadow-sm'
+                          : 'bg-slate-50 text-slate-700 border border-slate-100 rounded-bl-sm'
+                      }`}
+                      style={msg.role === 'user' ? { background: 'linear-gradient(135deg, #6366f1, #7c3aed)' } : {}}
+                    >
+                      {msg.role === 'bot' && (
+                        <span className="flex items-center gap-1.5 mb-1.5">
+                          <Sparkles size={10} className="text-indigo-400" />
+                          <span className="text-xs text-indigo-500 font-semibold">AI ✨</span>
+                        </span>
+                      )}
+                      <p className="whitespace-pre-wrap break-words">{msg.text}</p>
+                    </div>
+                    {msg.role === 'bot' && msg.toolCalls?.length > 0 && (
+                      <BotToolResult toolCalls={msg.toolCalls} />
                     )}
-                    <p className="whitespace-pre-wrap break-words">{msg.text}</p>
                   </div>
                 </div>
               ))}
@@ -349,3 +362,70 @@ export default function GlobalBotDrawer({ onClose }) {
     </>
   )
 }
+
+function BotToolResult({ toolCalls }) {
+  const images = []
+  const files = []
+
+  for (const { result } of toolCalls) {
+    if (!result) continue
+
+    // list_shared_documents → { documents: [{filename, ...}] }
+    if (result.documents) {
+      for (const doc of result.documents) {
+        const url = `${API_BASE}/media/file/${encodeURIComponent(doc.filename)}`
+        if (IMAGE_EXT.test(doc.filename)) {
+          images.push({ url, name: doc.filename })
+        } else {
+          files.push({ url, name: doc.filename })
+        }
+      }
+    }
+
+    // Array results: find_media, fetch_unread_images, search_messages
+    if (Array.isArray(result)) {
+      for (const r of result) {
+        if (!r.media_url) continue
+        const url = resolveUrl(r.media_url)
+        if (r.media_type === 'image' || IMAGE_EXT.test(r.content || '')) {
+          images.push({ url, name: r.content || 'image' })
+        } else if (r.media_type === 'document' || r.media_type === 'file') {
+          files.push({ url, name: r.content || 'file' })
+        }
+      }
+    }
+  }
+
+  if (!images.length && !files.length) return null
+
+  return (
+    <div className="space-y-2">
+      {images.map((img, i) => (
+        <div key={i} className="rounded-xl overflow-hidden border border-indigo-100 bg-slate-50 shadow-sm">
+          <img
+            src={img.url}
+            alt={img.name}
+            className="w-full max-h-56 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={() => window.open(img.url, '_blank')}
+            onError={(e) => { e.currentTarget.closest('div').style.display = 'none' }}
+          />
+          <p className="text-xs text-slate-400 px-3 py-1.5 truncate">{img.name}</p>
+        </div>
+      ))}
+      {files.map((file, i) => (
+        <a
+          key={i}
+          href={file.url}
+          target="_blank"
+          rel="noreferrer"
+          className="flex items-center gap-2 px-3 py-2 bg-white border border-indigo-100 rounded-xl text-xs text-indigo-600 hover:bg-indigo-50 transition-all shadow-sm"
+        >
+          <span>📄</span>
+          <span className="truncate flex-1">{file.name}</span>
+          <span className="text-slate-400 flex-shrink-0">↗</span>
+        </a>
+      ))}
+    </div>
+  )
+}
+
