@@ -140,7 +140,23 @@ async def _handle_send_message(sender_id: str, data: dict, manager) -> None:
     msg_type = "group" if group_id else "dm"
     messages_sent_total.labels(type=msg_type).inc()
 
-    event = {"type": "message", "data": _serialize_message(msg)}
+    # Attach display_name so group chat can render sender names without extra lookups
+    sender_name = ""
+    if group_id:
+        try:
+            pool = get_pg_pool()
+            async with pool.acquire() as conn:
+                row = await conn.fetchrow(
+                    "SELECT display_name FROM users WHERE user_id=$1", sender_id
+                )
+            sender_name = row["display_name"] if row else ""
+        except Exception:
+            pass
+
+    serialized = _serialize_message(msg)
+    if sender_name:
+        serialized["sender_name"] = sender_name
+    event = {"type": "message", "data": serialized}
 
     if group_id:
         delivered_to = await manager.broadcast_to_group(group_id, event, exclude_user=sender_id)

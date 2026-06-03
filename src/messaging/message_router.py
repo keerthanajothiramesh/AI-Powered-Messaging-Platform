@@ -105,7 +105,24 @@ async def get_group_history(
         if not member:
             raise HTTPException(status_code=403, detail="Not a group member")
     messages = await get_group_messages(group_id, limit, skip)
-    return [_to_response(m) for m in messages]
+
+    # Bulk-resolve sender_id → display_name in one PostgreSQL query
+    sender_ids = list({str(m["sender_id"]) for m in messages if m.get("sender_id")})
+    name_map: dict = {}
+    if sender_ids:
+        async with pool.acquire() as conn:
+            rows = await conn.fetch(
+                "SELECT user_id::text, display_name FROM users WHERE user_id::text = ANY($1)",
+                sender_ids,
+            )
+            name_map = {r["user_id"]: r["display_name"] for r in rows}
+
+    result = []
+    for m in messages:
+        d = _to_response(m)
+        d["sender_name"] = name_map.get(str(m.get("sender_id", "")), "")
+        result.append(d)
+    return result
 
 
 @router.put("/{message_id}/read")

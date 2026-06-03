@@ -387,6 +387,7 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
             key={msg.message_id}
             msg={msg}
             isOwn={msg.sender_id === user?.user_id}
+            isGroup={activeConversation.isGroup}
             onEdit={handleEdit}
             onDelete={handleDelete}
             onReact={handleReact}
@@ -657,7 +658,7 @@ export default function ChatWindow({ onRightTabChange, activeRightTab, onInfoOpe
 
 const QUICK_REACTIONS = ['👍', '❤️', '😂', '😮', '😢', '🙏']
 
-function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
+function MessageBubble({ msg, isOwn, isGroup, onEdit, onDelete, onReact }) {
   const [hovered, setHovered] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState(msg.content)
@@ -694,12 +695,27 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
     if (e.key === 'Escape') setEditing(false)
   }
 
+  const senderName = msg.sender_name || ''
+  const initials = senderName ? senderName.slice(0, 2).toUpperCase() : '?'
+  const showSenderInfo = isGroup && !isOwn && senderName
+
   return (
     <div
-      className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+      className={`flex items-end gap-2 ${isOwn ? 'justify-end' : 'justify-start'}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
+      {/* Avatar — only for other people's messages in a group */}
+      {showSenderInfo && (
+        <div
+          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 self-end mb-5"
+          style={{ background: 'linear-gradient(135deg, #818cf8, #7c3aed)' }}
+        >
+          {initials}
+        </div>
+      )}
+      {!showSenderInfo && isGroup && !isOwn && <div className="w-7 flex-shrink-0" />}
+
       <div className={`max-w-xs lg:max-w-md ${isOwn ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
         {!isDeleted && hovered && (
           <div className={`flex gap-0.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
@@ -744,6 +760,10 @@ function MessageBubble({ msg, isOwn, onEdit, onDelete, onReact }) {
               </>
             )}
           </div>
+        )}
+
+        {showSenderInfo && (
+          <span className="text-xs font-semibold text-indigo-500 ml-1 mb-0.5">{senderName}</span>
         )}
 
         <div
