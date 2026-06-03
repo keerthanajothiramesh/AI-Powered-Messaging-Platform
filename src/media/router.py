@@ -1,3 +1,4 @@
+"""Media REST endpoints — upload files (S3 or local), retrieve media records, and serve local files."""
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, Query
 from fastapi.responses import FileResponse
 from pathlib import Path

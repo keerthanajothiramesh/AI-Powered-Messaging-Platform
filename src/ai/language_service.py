@@ -1,3 +1,4 @@
+"""Language detection helpers — identifies English vs Japanese text using langdetect."""
 from typing import Optional
 from src.common.logger import get_logger
 

@@ -1,3 +1,4 @@
+"""Custom exception classes and FastAPI exception handlers for consistent JSON error responses."""
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError

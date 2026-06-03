@@ -1,4 +1,4 @@
-"""RAG sub-package — re-exports all public functions."""
+"""RAG sub-package — re-exports summarisation, catch-up, and AI search public functions."""
 from src.ai.rag.summariser import (
     summarise_with_stats,
     summarise_conversation,

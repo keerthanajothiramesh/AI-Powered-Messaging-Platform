@@ -1,4 +1,4 @@
-"""Message formatting and user-name resolution for RAG prompts."""
+"""Message formatting and user-name resolution helpers that prepare conversation text for LLM prompts."""
 import uuid as _uuid_mod
 from typing import Dict, List, Optional
 

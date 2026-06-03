@@ -1,4 +1,4 @@
-"""Auth API tests."""
+"""Integration tests for user registration, login, wrong-password rejection, token-based profile fetch, and health check — all run against a live server at localhost:8000."""
 import pytest
 import httpx
 import asyncio

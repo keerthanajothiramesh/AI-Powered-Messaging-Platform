@@ -1,4 +1,4 @@
-"""AI-enhanced search over message history."""
+"""AI-enhanced semantic search over message and document history with LLM answer synthesis."""
 from typing import Dict, Optional
 
 from src.ai.gemini_client import generate_text

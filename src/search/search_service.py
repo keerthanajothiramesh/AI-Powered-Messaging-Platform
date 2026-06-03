@@ -1,3 +1,4 @@
+"""Hybrid search service combining BM25, semantic vector search, and document chunks via Reciprocal Rank Fusion."""
 import asyncio
 from typing import List, Dict, Any, Optional
 from src.common.logger import get_logger

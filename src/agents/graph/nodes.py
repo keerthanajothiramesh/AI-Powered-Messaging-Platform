@@ -1,4 +1,4 @@
-"""LangGraph node functions — each returns only the state keys it mutates."""
+"""LangGraph node functions — moderate, route, search, summarise, deliver, notify, judge, and finalise."""
 from __future__ import annotations
 from typing import Any, Dict, Optional
 

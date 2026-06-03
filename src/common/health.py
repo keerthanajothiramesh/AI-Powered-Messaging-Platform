@@ -1,3 +1,4 @@
+"""Health check endpoints — overall status, database connectivity, AI client, and vector store checks."""
 from fastapi import APIRouter
 from src.common.logger import get_logger
 from src.common.database import get_pg_pool, get_mongo_db

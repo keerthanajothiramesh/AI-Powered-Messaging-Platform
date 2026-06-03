@@ -1,7 +1,4 @@
-"""
-Backward-compatible re-export stub.
-Implementation lives in src/ai/rag/ package.
-"""
+"""Backward-compatible re-export stub — delegates RAG summarisation functions to src/ai/rag/."""
 from src.ai.rag import (  # noqa: F401
     summarise_with_stats,
     summarise_conversation,

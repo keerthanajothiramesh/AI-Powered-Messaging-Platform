@@ -1,7 +1,4 @@
-"""
-Backward-compatible re-export stub.
-Implementation lives in src/ai/chatbot/ package.
-"""
+"""Backward-compatible re-export stub — delegates ChatbotSession and session helpers to src/ai/chatbot/."""
 from src.ai.chatbot.session import (  # noqa: F401
     ChatbotSession,
     get_or_create_session,

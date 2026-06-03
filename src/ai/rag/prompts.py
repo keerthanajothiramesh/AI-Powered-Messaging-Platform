@@ -1,4 +1,4 @@
-"""LLM prompt templates for RAG summarisation."""
+"""System prompt templates for group summarisation, DM summarisation, and catch-up RAG pipelines."""
 
 SUMMARY_PROMPT = """You are an AI assistant summarising a chat conversation.
 Provide a concise, structured summary covering:

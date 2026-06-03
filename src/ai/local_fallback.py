@@ -1,9 +1,4 @@
-"""
-Flan-T5 local LLM fallback — activated when the Gemini circuit breaker is open.
-
-Model: google/flan-t5-small (~300 MB, CPU-only, no GPU required)
-Loaded lazily on first fallback invocation so it does not slow cold start.
-"""
+"""Flan-T5-small CPU fallback for text generation when the OpenAI circuit breaker is open."""
 
 import asyncio
 from src.common.logger import get_logger

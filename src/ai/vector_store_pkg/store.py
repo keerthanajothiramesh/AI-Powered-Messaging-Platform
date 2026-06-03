@@ -1,4 +1,4 @@
-"""VectorStore: composes message + document mixins, exposes singleton."""
+"""VectorStore class — composes message and document pgvector mixins and exposes a module-level singleton."""
 from typing import Dict, List, Optional
 
 from src.ai.vector_store_pkg.message_store import MessageVectorMixin

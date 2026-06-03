@@ -1,3 +1,4 @@
+"""In-memory WebSocket connection manager tracking active users, group rooms, and broadcast helpers."""
 import json
 from typing import Dict, Set, List, Optional
 from fastapi import WebSocket

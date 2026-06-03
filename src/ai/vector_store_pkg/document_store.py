@@ -1,4 +1,4 @@
-"""Document chunk embedding storage and retrieval via pgvector."""
+"""pgvector mixin for document-chunk embedding upsert and semantic similarity search over uploaded files."""
 from typing import Any, Dict, List, Optional
 
 from src.common.logger import get_logger

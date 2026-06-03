@@ -1,3 +1,4 @@
+"""Search agent — runs hybrid search and uses the LLM to rank and analyse the top results."""
 from typing import Dict, Any
 from src.agents.base_agent import BaseAgent
 from src.common.logger import get_logger

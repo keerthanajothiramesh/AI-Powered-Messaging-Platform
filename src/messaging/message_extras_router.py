@@ -1,4 +1,4 @@
-"""Supplementary message endpoints: unread images, reply suggestions, reactions."""
+"""Supplementary message endpoints — unread images, AI reply suggestions, and emoji reactions."""
 import json
 import re
 from typing import List

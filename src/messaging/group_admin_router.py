@@ -1,4 +1,4 @@
-"""Group admin endpoints: add/remove members, role changes, edit, delete."""
+"""Group admin endpoints — add/remove members, change roles, update group info, and delete groups."""
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.auth.dependencies import get_current_user

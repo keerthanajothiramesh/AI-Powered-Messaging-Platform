@@ -1,11 +1,4 @@
-"""Builds and compiles the LangGraph agent graph.
-
-Flow:
-  START → moderate → (block→finalise | route→router)
-  router → search|summarise|delivery|notify
-  search/summarise → judge → (retry|finalise)
-  delivery/notify → finalise → END
-"""
+"""Builds and compiles the LangGraph state graph: moderate → route → agent → judge → finalise."""
 from __future__ import annotations
 from typing import Any, Dict, Literal, Optional
 

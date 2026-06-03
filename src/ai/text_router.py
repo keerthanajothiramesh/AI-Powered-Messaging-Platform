@@ -1,4 +1,4 @@
-"""AI text utility endpoints: translate, improve-draft, topics, highlights, autocomplete."""
+"""AI text utility endpoints — translate, tone-improve draft, detect topics, highlight key messages, and autocomplete."""
 import json
 import re
 from typing import Dict, List

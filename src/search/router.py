@@ -1,3 +1,4 @@
+"""Search API endpoints — hybrid search, semantic-only search, and media search."""
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from typing import Optional, Dict

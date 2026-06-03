@@ -1,3 +1,4 @@
+"""Pydantic schemas for messaging — send/edit requests, message and group response models."""
 from pydantic import BaseModel, Field
 from typing import Optional, List, Dict, Any
 from datetime import datetime

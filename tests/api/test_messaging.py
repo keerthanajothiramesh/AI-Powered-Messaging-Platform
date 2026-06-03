@@ -1,4 +1,4 @@
-"""Messaging API tests."""
+"""Integration tests for group creation, sending messages to a group, fetching message history, and listing a user's groups — all run against a live server at localhost:8000."""
 import pytest
 import httpx
 import uuid

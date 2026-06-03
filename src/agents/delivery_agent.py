@@ -1,3 +1,4 @@
+"""Delivery agent — retries failed messages, re-delivers to online users, and escalates stale failures."""
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
 

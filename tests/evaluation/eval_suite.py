@@ -1,16 +1,4 @@
-"""
-Evaluation suite — LLM-as-Judge + IR metrics for search and summarisation.
-
-Metrics:
-  Search    : Precision@5, NDCG@5 (binary relevance)
-  Summarise : LLM-as-Judge (relevance · accuracy · completeness, 0-10 each)
-              + keyword topic coverage
-
-Usage:
-    python tests/evaluation/eval_suite.py
-    python tests/evaluation/eval_suite.py --json          # machine-readable output
-    python tests/evaluation/eval_suite.py --case s1       # single search case
-"""
+"""Offline evaluation suite that measures hybrid search quality (Precision@5, NDCG@5) and summarisation quality (LLM-as-Judge on relevance, accuracy, completeness) against the 60k demo message corpus."""
 
 import asyncio
 import json

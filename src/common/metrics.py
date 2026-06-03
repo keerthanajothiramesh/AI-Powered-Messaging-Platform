@@ -1,4 +1,4 @@
-"""Prometheus metrics collection for the messaging platform."""
+"""Prometheus counters, histograms, and gauges for HTTP requests, messages, AI calls, and WebSocket connections."""
 import time
 from prometheus_client import (
     Counter, Histogram, Gauge,

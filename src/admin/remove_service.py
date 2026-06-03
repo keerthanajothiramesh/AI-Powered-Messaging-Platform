@@ -1,4 +1,4 @@
-"""Remove all demo data from the database."""
+"""Demo data removal service — deletes all is_demo-flagged users, groups, messages, and embeddings."""
 from src.admin.progress import reset_progress, set_status, set_step
 from src.common.database import get_mongo_db, get_pg_pool
 from src.common.logger import get_logger

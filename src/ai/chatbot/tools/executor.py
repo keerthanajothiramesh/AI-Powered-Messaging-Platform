@@ -1,4 +1,4 @@
-"""Dispatches all chatbot tool calls to their handler functions."""
+"""Tool call dispatcher — routes chatbot tool names to their async handler functions."""
 from typing import Any, Dict
 
 from src.ai.chatbot.tools.info import (

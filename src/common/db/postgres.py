@@ -1,4 +1,4 @@
-"""PostgreSQL connection pool and schema management."""
+"""asyncpg connection pool setup, pgvector table creation, and schema migration for PostgreSQL."""
 import asyncpg
 from typing import Optional
 

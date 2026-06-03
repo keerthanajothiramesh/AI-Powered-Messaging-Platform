@@ -1,4 +1,4 @@
-"""Messaging action handlers: unread images, send message, group member status."""
+"""Chatbot tool handlers for messaging actions — fetch unread images, send a DM, and list group member status."""
 from typing import Any, Dict
 
 from src.common.logger import get_logger

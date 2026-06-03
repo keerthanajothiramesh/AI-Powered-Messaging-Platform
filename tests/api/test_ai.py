@@ -1,4 +1,4 @@
-"""AI API tests."""
+"""Integration tests for AI chat, RAG-backed semantic search, hybrid BM25+vector search, and catch-up summary — all run against a live server at localhost:8000."""
 import pytest
 import httpx
 import uuid

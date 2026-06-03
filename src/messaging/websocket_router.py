@@ -1,3 +1,4 @@
+"""WebSocket endpoint — authenticates connections, delivers queued messages, and handles real-time events."""
 import json
 import time
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query

@@ -1,4 +1,4 @@
-"""Core group and DM summarisation with token-aware chunking."""
+"""Group and DM conversation summarisation using token-aware chunking and few-shot examples."""
 import json
 import re
 from datetime import datetime, timedelta, timezone

@@ -1,3 +1,4 @@
+"""FastAPI dependency that validates the Bearer token and returns the current user's TokenData."""
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 

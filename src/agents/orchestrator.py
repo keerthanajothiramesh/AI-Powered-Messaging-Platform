@@ -1,3 +1,4 @@
+"""Public orchestration entrypoint — delegates queries to the LangGraph agent state machine."""
 from typing import Any, Dict, Optional
 
 from src.common.logger import get_logger

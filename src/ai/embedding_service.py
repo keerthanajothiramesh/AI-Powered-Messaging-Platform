@@ -1,3 +1,4 @@
+"""Sentence-embedding service using BAAI/bge-small-en-v1.5 via fastembed-ONNX (384-dim vectors)."""
 import asyncio
 from typing import List, Optional
 from src.common.logger import get_logger

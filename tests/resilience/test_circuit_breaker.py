@@ -1,20 +1,4 @@
-"""
-Resilience tests for circuit breaker and component failure scenarios.
-
-Run:
-    pytest tests/resilience/ -v
-
-What is tested:
-    - OpenAI circuit breaker opens after 3 consecutive failures
-    - Circuit breaker resets to closed on success
-    - Open circuit returns a fallback string without calling OpenAI
-    - DeliveryAgent returns zeros when no failed messages exist
-    - DeliveryAgent does not raise when MongoDB is unavailable
-    - NotificationAgent suppresses low-priority during notification fatigue
-    - NotificationAgent lets urgent messages bypass fatigue + quiet hours
-    - RCAAgent returns a healthy report when no delivery failures exist
-    - WebSocket manager handles 20 concurrent sends without race conditions
-"""
+"""Resilience tests covering the OpenAI circuit breaker (open/close/reset), graceful MongoDB failure handling, notification fatigue suppression, urgent-message bypass, and WebSocket concurrency safety."""
 import asyncio
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch

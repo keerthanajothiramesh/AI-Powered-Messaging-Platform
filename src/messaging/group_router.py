@@ -1,4 +1,4 @@
-"""Group CRUD endpoints: create, list, get details."""
+"""Group CRUD endpoints — create a group, list the current user's groups, and fetch group details."""
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
 

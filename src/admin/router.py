@@ -1,4 +1,4 @@
-"""Admin API endpoints — delegate heavy work to service modules."""
+"""Admin REST API — check seed status, trigger demo data seeding, and remove demo data."""
 from fastapi import APIRouter, BackgroundTasks, Depends
 
 from src.admin.progress import get_progress

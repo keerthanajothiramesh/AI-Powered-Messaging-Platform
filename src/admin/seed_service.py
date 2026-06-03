@@ -1,4 +1,4 @@
-"""Seed and remove demo dataset from database."""
+"""Demo dataset seeder — loads users, groups, members, and messages from JSON fixtures into Postgres and MongoDB."""
 import json
 from datetime import datetime
 from pathlib import Path

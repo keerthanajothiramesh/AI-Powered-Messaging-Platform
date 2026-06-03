@@ -1,3 +1,4 @@
+"""Structured JSON logging configuration using structlog with stdlib integration."""
 import logging
 import sys
 import structlog

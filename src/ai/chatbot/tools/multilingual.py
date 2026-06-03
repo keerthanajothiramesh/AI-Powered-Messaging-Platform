@@ -1,4 +1,4 @@
-"""Multilingual tool handlers: reply suggestions, voice decode, compose, explain, group summaries."""
+"""Chatbot multilingual tool handlers — reply suggestions, message decode, compose in Japanese, and cross-language summaries."""
 import asyncio
 import json
 import re

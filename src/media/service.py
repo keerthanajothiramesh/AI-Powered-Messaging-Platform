@@ -1,3 +1,4 @@
+"""Media upload service — stores files to S3 or local disk, extracts text, and indexes chunks in pgvector."""
 import uuid
 import os
 import asyncio

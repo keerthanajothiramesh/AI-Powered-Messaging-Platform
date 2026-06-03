@@ -1,4 +1,4 @@
-"""Message embedding storage and retrieval via pgvector."""
+"""pgvector mixin for per-message embedding upsert and cosine-similarity search."""
 from typing import Any, Dict, List, Optional
 
 from src.common.logger import get_logger

@@ -1,3 +1,4 @@
+"""OpenAI GPT-4o-mini client with circuit breaker, tool-calling support, and local Flan-T5 fallback."""
 import asyncio
 import json
 import time

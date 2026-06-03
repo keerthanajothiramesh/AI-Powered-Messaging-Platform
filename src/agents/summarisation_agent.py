@@ -1,3 +1,4 @@
+"""Summarisation agent — generates group conversation summaries with LLM-as-Judge quality gating."""
 from typing import Dict, Any
 
 from src.agents.base_agent import BaseAgent

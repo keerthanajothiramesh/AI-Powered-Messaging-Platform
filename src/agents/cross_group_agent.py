@@ -1,10 +1,4 @@
-"""
-Cross-group moderation intelligence agent.
-
-Scans recent messages across all groups for coordinated toxic patterns —
-the same user posting harmful content in multiple groups, or identical
-spam/abuse appearing across several channels simultaneously.
-"""
+"""Cross-group moderation agent — detects coordinated toxic patterns from users active across multiple groups."""
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
 

@@ -1,4 +1,4 @@
-"""Date/datetime parsing helpers for admin seed operations."""
+"""Date and datetime parsing helpers used by the admin seed service to normalise fixture data."""
 from datetime import date, datetime
 from typing import Optional
 

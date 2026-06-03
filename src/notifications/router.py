@@ -1,3 +1,4 @@
+"""Notifications REST endpoints — list the current user's notifications and mark them all as read."""
 from fastapi import APIRouter, Depends
 from src.auth.dependencies import get_current_user
 from src.notifications.service import get_user_notifications, mark_notifications_read

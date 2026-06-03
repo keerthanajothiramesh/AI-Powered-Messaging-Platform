@@ -1,4 +1,4 @@
-"""Token-aware message chunking for RAG summarisation."""
+"""Token-aware message chunking for RAG — splits message lists into overlapping token-budget chunks."""
 from typing import List, Dict
 
 _CHUNK_TOKEN_LIMIT = 3_000

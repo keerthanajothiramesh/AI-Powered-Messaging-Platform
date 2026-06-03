@@ -1,4 +1,4 @@
-"""Locust load test: 100 concurrent users."""
+"""Locust load test simulating 100 concurrent users sending messages, fetching group history, searching, and hitting the health endpoint to measure throughput and latency under load."""
 import uuid
 import json
 from locust import HttpUser, task, between

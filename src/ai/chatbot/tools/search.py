@@ -1,4 +1,4 @@
-"""Search & retrieval tool handlers: time search, documents, group catch-up."""
+"""Chatbot tool handlers for search and retrieval — time-windowed search, document lookup, and group catch-up."""
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 

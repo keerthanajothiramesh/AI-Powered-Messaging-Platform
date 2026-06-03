@@ -1,4 +1,4 @@
-"""Core message persistence and retrieval."""
+"""Core message persistence and retrieval for DMs and group messages in MongoDB."""
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional

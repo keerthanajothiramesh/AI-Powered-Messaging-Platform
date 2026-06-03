@@ -1,3 +1,4 @@
+"""REST message endpoints — send DM/group messages, fetch history, edit, delete, and mark read."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from src.auth.dependencies import get_current_user
 from src.common.database import get_mongo_db, get_pg_pool

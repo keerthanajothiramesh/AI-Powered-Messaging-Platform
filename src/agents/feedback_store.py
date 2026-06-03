@@ -1,4 +1,4 @@
-"""Persistence layer for LLM-as-Judge scores and user feedback ratings."""
+"""MongoDB persistence for LLM-as-Judge scores, user thumbs-up/down ratings, and agent run results."""
 from datetime import datetime, timezone
 from typing import Dict, Any, List
 from src.common.logger import get_logger

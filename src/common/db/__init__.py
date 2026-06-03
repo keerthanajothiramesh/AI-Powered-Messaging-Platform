@@ -1,4 +1,4 @@
-"""Database sub-package — re-exports all connection helpers."""
+"""Database sub-package — re-exports all PostgreSQL and MongoDB connection and schema helpers."""
 from src.common.db.postgres import (  # noqa: F401
     init_postgres, close_postgres, get_pg_pool, create_pg_tables,
 )

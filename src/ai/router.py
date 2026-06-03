@@ -1,4 +1,4 @@
-"""Core AI endpoints: search, summarise, catchup, chat, health."""
+"""Core AI REST endpoints — semantic search, group summarisation, catch-up summary, and chatbot."""
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 

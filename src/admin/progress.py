@@ -1,4 +1,4 @@
-"""In-memory seed progress state shared across admin endpoints."""
+"""In-memory progress tracker for demo seeding — exposes step/count state to the admin status endpoint."""
 from typing import Any, Dict
 
 _INITIAL: Dict[str, Any] = {

@@ -1,8 +1,4 @@
-"""Two-layer chatbot input guardrails.
-
-Layer 1 (sync): Regex — prompt injection, jailbreaks, XSS patterns.
-Layer 2 (async): OpenAI Moderation API — hate, harassment, self-harm, sexual, violence.
-"""
+"""Two-layer chatbot guardrails — sync regex for prompt-injection and async OpenAI Moderation API for harmful content."""
 import re
 from src.common.logger import get_logger
 

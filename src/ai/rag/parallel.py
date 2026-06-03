@@ -1,4 +1,4 @@
-"""Parallel chunk summarisation and hierarchical merge."""
+"""Parallel chunk summarisation and recursive hierarchical merge for large conversation RAG pipelines."""
 import asyncio
 from typing import Callable, Dict, List, Optional
 

@@ -1,3 +1,4 @@
+"""Pydantic request/response schemas for user registration, login, and token data."""
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 from datetime import datetime

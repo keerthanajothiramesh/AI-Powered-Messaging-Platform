@@ -1,4 +1,4 @@
-"""Offline message queue helpers — queued/expired message management."""
+"""Offline message queue helpers — track queued delivery status and expire stale messages."""
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List
 

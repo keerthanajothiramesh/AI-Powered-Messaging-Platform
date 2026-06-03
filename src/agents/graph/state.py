@@ -1,4 +1,4 @@
-"""Typed state shared across all LangGraph nodes."""
+"""AgentState TypedDict — shared state passed between all nodes in the LangGraph agent graph."""
 from __future__ import annotations
 from typing import Any, Dict, Optional, TypedDict
 

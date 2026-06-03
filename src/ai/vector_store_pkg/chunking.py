@@ -1,4 +1,4 @@
-"""Text chunking for document embedding."""
+"""Character-level overlapping text chunker for splitting documents before embedding."""
 from typing import List
 
 

@@ -1,3 +1,4 @@
+"""Auth API endpoints — register, login, Google OAuth, /me profile, and logout."""
 import uuid
 from fastapi import APIRouter, HTTPException, Depends, Body
 from datetime import datetime, timezone

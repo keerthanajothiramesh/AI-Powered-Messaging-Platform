@@ -1,3 +1,4 @@
+"""JWT token creation/decoding and bcrypt password hashing for the auth flow."""
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt

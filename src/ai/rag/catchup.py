@@ -1,4 +1,4 @@
-"""Catch-up summary for users who were offline."""
+"""Generates structured catch-up summaries for users returning from offline across DMs and groups."""
 import asyncio
 from datetime import datetime
 from typing import Dict

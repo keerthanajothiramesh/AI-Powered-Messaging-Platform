@@ -1,4 +1,4 @@
-"""Demo embedding generation — batch-embeds all demo messages."""
+"""Batch embedding generator — embeds all demo text messages and upserts vectors into pgvector."""
 import asyncio
 from pathlib import Path
 

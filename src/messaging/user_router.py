@@ -1,3 +1,4 @@
+"""User endpoints — profile lookup, search by name/email, presence updates, and email resolution."""
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import List, Optional
 from pydantic import BaseModel

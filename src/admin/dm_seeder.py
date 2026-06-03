@@ -1,4 +1,4 @@
-"""Seeds demo DM conversations between real user and synthetic users."""
+"""Seeds realistic DM conversation threads between the requester and synthetic demo users."""
 from datetime import datetime, timedelta, timezone
 from random import choice, randint, sample
 from uuid import uuid4

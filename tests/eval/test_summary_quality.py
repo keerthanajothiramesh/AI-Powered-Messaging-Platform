@@ -1,19 +1,4 @@
-"""
-DeepEval-based evaluation for conversation summarisation quality.
-
-Run:
-    pytest tests/eval/test_summary_quality.py -v
-
-Requires:
-    pip install deepeval
-    GOOGLE_API_KEY set (used by deepeval's G-Eval under the hood)
-
-What is tested:
-    - Relevancy: does the summary cover the main topics?
-    - Coherence: is it well-structured and readable?
-    - Conciseness: is it under 300 words without losing key info?
-    - Custom HallucinationScore: no invented facts not present in the source messages
-"""
+"""DeepEval-based quality tests that verify good summaries pass LLM-graded metrics (relevancy, coherence, conciseness, faithfulness) and that bad or hallucinated summaries are correctly rejected."""
 import pytest
 from deepeval import evaluate
 from deepeval.metrics import (

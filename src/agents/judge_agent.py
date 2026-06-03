@@ -1,3 +1,4 @@
+"""LLM-as-Judge agent — scores summaries on relevance, accuracy, and completeness (0-10 each)."""
 from typing import Dict, Any
 from src.common.logger import get_logger
 from src.ai.gemini_client import generate_text

@@ -1,3 +1,4 @@
+"""Agents REST API — run orchestrator, rate summaries, trigger delivery recovery, RCA, and moderation scans."""
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Dict

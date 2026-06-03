@@ -1,13 +1,4 @@
-"""PII detection and anonymization using Presidio with a no-op NLP engine.
-
-Presidio is configured with a lightweight stub NLP engine instead of spaCy,
-so no NLP model is downloaded or loaded at runtime (~0 MB vs ~250 MB for
-en_core_web_sm). Pattern/regex-based recognizers (email, phone, credit card,
-SSN, IP address) work normally. PERSON and LOCATION NER is skipped — those
-entities require an actual spaCy model and are not critical for chat PII.
-
-Falls back to plain regex when presidio-analyzer is not installed.
-"""
+"""PII detection and anonymization via Presidio pattern recognizers with a regex fallback when unavailable."""
 import re
 from typing import Tuple, List
 from src.common.logger import get_logger

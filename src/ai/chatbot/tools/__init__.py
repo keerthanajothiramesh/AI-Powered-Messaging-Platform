@@ -1,4 +1,4 @@
-"""Chatbot tool schemas and system prompt — single source of truth for all tool definitions."""
+"""Chatbot tool schemas and system prompt — defines all tool names, parameters, and routing instructions."""
 
 CHATBOT_TOOLS = [
     {

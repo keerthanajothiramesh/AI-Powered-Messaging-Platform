@@ -1,13 +1,4 @@
-"""
-Locust load test for the AI-Powered Messaging Platform.
-
-Run:
-    locust -f tests/load/locustfile.py --host http://localhost:8000 --users 50 --spawn-rate 5
-
-Scenarios simulated:
-    - AuthUser  : login → token stored per-user, runs all authenticated flows
-    - ReadOnlyUser: just hits read endpoints (history, search) — simulates passive viewers
-"""
+"""Realistic Locust load test with two user personas — active senders (75%) and read-only viewers (25%) — using actual demo dataset credentials and realistic message fixtures including Japanese."""
 import json
 import random
 from locust import HttpUser, task, between, events

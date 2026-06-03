@@ -1,4 +1,4 @@
-"""Compositional tool handlers: draft reply, translate, set status, reminders."""
+"""Chatbot tool handlers for composition — draft replies, translate messages, set status, and manage reminders."""
 import uuid as _uuid
 from datetime import datetime, timezone
 from typing import Any, Dict

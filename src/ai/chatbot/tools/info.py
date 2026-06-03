@@ -1,4 +1,4 @@
-"""Informational tool handlers: action items, activity stats, unread count, meetings."""
+"""Chatbot tool handlers for informational queries — action items, group activity stats, unread count, and meetings."""
 import json
 import re
 import uuid as _uuid

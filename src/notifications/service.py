@@ -1,3 +1,4 @@
+"""Notification service — create, fetch, and mark-read notifications stored in MongoDB."""
 import uuid
 from typing import List, Dict, Any
 from datetime import datetime, timezone

@@ -1,4 +1,4 @@
-"""Root Cause Analysis agent — uses Gemini to explain delivery failure patterns."""
+"""Root cause analysis agent — aggregates delivery failure stats and produces LLM-driven root cause reports."""
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List
 

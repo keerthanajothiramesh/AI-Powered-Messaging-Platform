@@ -1,15 +1,4 @@
-"""
-Content moderation agent.
-
-Primary:  OpenAI Moderation API — context-aware, multilingual, category scores.
-Fallback: Regex patterns — used when OpenAI client is unavailable (circuit open).
-
-Two-tier action mapping:
-  category_score >= 0.8  → block   (high confidence harmful)
-  category_score >= 0.5  → warn    (borderline — pass through with warning)
-  category_score <  0.5  → allow
-  Safety override: any score >= 0.8 always blocks regardless of category.
-"""
+"""Content moderation agent — OpenAI Moderation API primary with regex fallback, mapping scores to block/warn/allow."""
 import re
 from typing import Dict, Any, List, Tuple
 

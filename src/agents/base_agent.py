@@ -1,3 +1,4 @@
+"""Abstract BaseAgent providing the common run() interface and LLM generation helper for all agents."""
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from src.common.logger import get_logger

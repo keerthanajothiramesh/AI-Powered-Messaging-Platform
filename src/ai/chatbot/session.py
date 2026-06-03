@@ -1,4 +1,4 @@
-"""ChatbotSession — multi-turn conversation with tool calling."""
+"""ChatbotSession — multi-turn conversation manager with PII scrubbing, tool calling, and LLM-as-Judge scoring."""
 import asyncio
 from typing import Any, Dict, List, Optional
 

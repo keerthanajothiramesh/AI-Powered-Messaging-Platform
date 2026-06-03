@@ -1,4 +1,4 @@
-"""Smart notification agent — analyses user activity patterns to reduce fatigue."""
+"""Notification agent — analyses user activity patterns and quiet hours to reduce notification fatigue."""
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional
 

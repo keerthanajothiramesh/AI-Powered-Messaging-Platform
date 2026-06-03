@@ -1,4 +1,4 @@
-"""MongoDB connection management and index creation."""
+"""Motor async MongoDB client setup, connection management, and index creation for all collections."""
 import motor.motor_asyncio
 from typing import Optional
 
